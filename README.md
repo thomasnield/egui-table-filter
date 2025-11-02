@@ -1,6 +1,6 @@
 This is my successful attempt to recreate a table filter control in Rust for the egui library. 
 
-I first made for [JavaFX almost 10 years ago](http://fxexperience.com/2016/03/introducing-the-controlsfx-tablefilter/). 
+I first made this for [JavaFX almost 10 years ago](http://fxexperience.com/2016/03/introducing-the-controlsfx-tablefilter/). 
 
 I would like to make this into a library so I welcome any contributions to make the API more streamlined. It is highly flexible and configurable, and I'd like to expand on that while keeping it easy to use. 
 
