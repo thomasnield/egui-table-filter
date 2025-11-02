@@ -1,0 +1,12 @@
+[package]
+name = "egui-table-filter"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+itertools = "0.14.0"
+eframe = "0.32.3"
+chrono = "0.4.42"
+
+egui = "0.32.3"
+egui_extras =  { version ="0.32.3", features = ["datepicker","all_loaders"] }
