@@ -9,3 +9,9 @@ I would like to make this into a library so I welcome any contributions to make 
 You can also create custom search functionality to parse the strings for special syntax, like regular expressions or date ranges. 
 
 <img width="586" height="593" alt="image" src="https://github.com/user-attachments/assets/3e6a93cc-b93d-4841-97f5-41d20eb31ed4" />
+
+## TODO
+
+[ ] Gray out entries that are no longer visible due to other column filter
+[ ] Have pre-defined templates to streamline common data types and operations (e.g., int ranges, date ranges, regular expressions)\
+[ ] Add double-clicking sorting functionality on the headers
