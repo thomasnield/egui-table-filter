@@ -12,6 +12,6 @@ You can also create custom search functionality to parse the strings for special
 
 ## TODO
 
-[ ] Gray out entries that are no longer visible due to other column filter
-[ ] Have pre-defined templates to streamline common data types and operations (e.g., int ranges, date ranges, regular expressions)\
-[ ] Add double-clicking sorting functionality on the headers
+- [ ] Gray out entries that are no longer visible due to other column filter
+- [ ] Have pre-defined templates to streamline common data types and operations (e.g., int ranges, date ranges, regular expressions)\
+- [ ] Add double-clicking sorting functionality on the headers
