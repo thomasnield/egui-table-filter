@@ -18,5 +18,5 @@ You can also create custom search functionality to parse the strings for special
 - [ ] Have pre-defined templates to streamline common data types and operations (e.g., search with int ranges, date ranges, regular expressions, comma-separated values)
 - [ ] Add double-clicking sorting functionality on the headers
 - [ ] Document a checklist that is needed for successful application to a table
-- [ ] Explore patterns outside the table in egui-extras, as this control is agnostic to controls
+- [ ] Explore patterns outside the table in egui-extras, as this widget is agnostic to controls it is bound to
 - [ ] Find opportunities to make more idiomatic without inflicting too much bias
