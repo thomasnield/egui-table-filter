@@ -4,6 +4,8 @@ use eframe::App;
 use chrono::NaiveDate;
 use egui::{Id, Label, Sense};
 use egui_extras::{TableBuilder, Column};
+use itertools::Itertools;
+use regex::Regex;
 use crate::table_filter::ColumnFilter;
 
 mod table_filter;
@@ -42,7 +44,7 @@ struct TableFilterApp {
 struct ColumnFilters {
     orig: ColumnFilter<Flight, String>,
     dest: ColumnFilter<Flight, String>,
-    dep_date: ColumnFilter<Flight, NaiveDate>,
+    dep_date: ColumnFilter<Flight, String>,
     mileage: ColumnFilter<Flight, u32>,
     cancelled: ColumnFilter<Flight, bool>,
     gate: ColumnFilter<Flight, String>,
@@ -81,17 +83,57 @@ impl Default for ColumnFilters {
             orig: ColumnFilter::new(
                 |flt: &Flight| flt.orig.clone(),
                 |flt| flt.orig.clone(),
-                |pattern, target| target.contains(pattern),
+                |pattern, target| target.starts_with(pattern),
             ),
             dest: ColumnFilter::new(
                 |flt: &Flight| flt.dest.clone(),
                 |flt| flt.dest.clone(),
-                |pattern, target| target.contains(pattern),
+                |pattern, target| target.starts_with(pattern),
             ),
             dep_date: ColumnFilter::new(
-                |flt: &Flight| flt.dep_date,
-                |flt| flt.dep_date.format("%Y-%m-%d").to_string(),
-                |pattern, target| target.contains(pattern),
+                |flt: &Flight| flt.dep_date.format("%m/%d/%Y").to_string(),
+                |flt| flt.dep_date.format("%m/%d/%Y").to_string(),
+                |pattern, target|  {
+
+                    return if Regex::new("[0-9]{1,2}/[0-9]{2}/[0-9]{4}><[0-9]{1,2}/[0-9]{2}/[0-9]{4}").unwrap().is_match(pattern) {
+                        let (dt_left,dt_right) = pattern.split("><").collect_tuple().unwrap();
+
+                        let dt_left = NaiveDate::parse_from_str(&dt_left, "%m/%d/%Y");
+                        let dt_right = NaiveDate::parse_from_str(&dt_right, "%m/%d/%Y");
+                        let dt = NaiveDate::parse_from_str(target, "%m/%d/%Y");
+
+                        if let Ok(dt_left) = dt_left {
+                            if let Ok(dt_right) = dt_right {
+                                if let Ok(dt) = dt {
+                                    dt_left <= dt && dt <= dt_right
+                                } else {
+                                    false
+                                }
+                            } else { false }
+                        } else { false }
+                    }
+                    else if Regex::new("<[0-9]{1,2}/[0-9]{2}/[0-9]{4}").unwrap().is_match(pattern) {
+                        let p = pattern.replace("<", "");
+
+                        if let Ok(p) = NaiveDate::parse_from_str(&p, "%m/%d/%Y") {
+                            if let Ok(s) = NaiveDate::parse_from_str(&target, "%m/%d/%Y") {
+                                s <= p
+                            } else { false }
+                        } else { false }
+                    } else if Regex::new(">[0-9]{1,2}/[0-9]{2}/[0-9]{4}").unwrap().is_match(pattern) {
+
+                        let p = pattern.replace(">", "");
+
+                        if let Ok(p) = NaiveDate::parse_from_str(&p, "%m/%d/%Y") {
+                            if let Ok(s) = NaiveDate::parse_from_str(&target, "%m/%d/%Y") {
+                                s >= p
+                            } else { false }
+                        } else { false }
+                    }
+                    else {
+                        target.starts_with(pattern)
+                    }
+                },
             ),
             mileage: ColumnFilter::new(
                 |flt: &Flight| flt.mileage,
@@ -208,7 +250,6 @@ impl App for TableFilterApp {
 
                     let (_, cancelled_resp) = header.col(|ui| {
                         ui.strong("CANCELLED");
-                        ui.strong("MILEAGE");
                         if self.column_filters.cancelled.is_active() {
                             ui.strong("🌰");
                         }
@@ -244,7 +285,7 @@ impl App for TableFilterApp {
                                 ui.label(&flight.dest);
                             });
                             row.col(|ui| {
-                                ui.label(flight.dep_date.format("%Y-%m-%d").to_string());
+                                ui.label(flight.dep_date.format("%m/%d/%Y").to_string());
                             });
                             row.col(|ui| {
                                 ui.label(flight.mileage.to_string());
