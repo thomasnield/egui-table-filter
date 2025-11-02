@@ -250,7 +250,6 @@ impl App for TableFilterApp {
 
                     let (_, cancelled_resp) = header.col(|ui| {
                         ui.strong("CANCELLED");
-                        ui.strong("MILEAGE");
                         if self.column_filters.cancelled.is_active() {
                             ui.strong("🌰");
                         }
