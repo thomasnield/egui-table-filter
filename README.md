@@ -15,7 +15,7 @@ You can also create custom search functionality to parse the strings for special
 ## TODO
 
 - [ ] Gray out entries that are no longer visible due to other column filter
-- [ ] Have pre-defined templates to streamline common data types and operations (e.g., int ranges, date ranges, regular expressions)\
+- [ ] Have pre-defined templates to streamline common data types and operations (e.g., search with int ranges, date ranges, regular expressions, comma-separated values)
 - [ ] Add double-clicking sorting functionality on the headers
 - [ ] Document a checklist that is needed for successful application to a table
 - [ ] Explore patterns outside the table in egui-extras, as this control is agnostic to controls
