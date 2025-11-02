@@ -1,4 +1,4 @@
-This is my successful attempt to re-create a table filter control in Rust for the egui library. 
+This is my successful attempt to recreate a table filter control in Rust for the egui library. 
 
 I first made for [JavaFX almost 10 years ago](http://fxexperience.com/2016/03/introducing-the-controlsfx-tablefilter/). 
 
