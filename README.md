@@ -2,6 +2,8 @@ This is my successful port of a table filter control in Rust for the egui librar
 
 I first made this for [JavaFX almost 10 years ago](http://fxexperience.com/2016/03/introducing-the-controlsfx-tablefilter/). 
 
+It can be used alongside the `TableBuilder` in [egui-extras](https://docs.rs/egui_extras/latest/egui_extras/), but can effectively be integrated with any control that needs to filter data. 
+
 I would like to make this into a library so I welcome any contributions to make the API more streamlined. It is highly flexible and configurable, and I'd like to expand on that while keeping it easy to use. 
 
 <img width="640" height="546" alt="image" src="https://github.com/user-attachments/assets/2a8a7bbf-5757-4758-95d6-5e2b73aa29a8" />
