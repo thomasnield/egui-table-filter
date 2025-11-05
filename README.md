@@ -1,4 +1,4 @@
-This is my successful port of a table filter control in Rust for the egui library. 
+This is my successful port of a table filter control in Rust for the egui library, although it probably could use some API cleanup for consumer usage. 
 
 I first made this for [JavaFX almost 10 years ago](http://fxexperience.com/2016/03/introducing-the-controlsfx-tablefilter/). 
 
@@ -15,8 +15,8 @@ You can also create custom search functionality to parse the strings for special
 ## TODO
 
 - [X] Gray out entries that are no longer visible due to other column filter
+- [ ] Extract out common methods as traits for `ColumnFilters` implementations
 - [ ] Have pre-defined templates to streamline common data types and operations (e.g., search with int ranges, date ranges, regular expressions, comma-separated values)
-- [ ] Add double-clicking sorting functionality on the headers
-- [ ] Document a checklist that is needed for successful application to a table
+- [ ] Documentation on usage
 - [ ] Explore patterns outside the table in egui-extras, as this widget is agnostic to controls it is bound to
-- [ ] Find opportunities to make more idiomatic without inflicting too much bias (macros might be needed :/)
+- [ ] Find opportunities to make more idiomatic without making overly opinionated (macros might be needed :/)
