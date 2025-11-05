@@ -1,4 +1,5 @@
 use std::any::Any;
+use std::collections::HashSet;
 use std::error::Error;
 use eframe::egui;
 use eframe::App;
@@ -214,7 +215,7 @@ impl Default for ColumnFilters {
             gate: ColumnFilter::new(
                 |flt: &Flight| flt.gate.clone().unwrap_or("N/A".to_string()),
                 |flt| flt.gate.clone().unwrap_or("N/A".to_string()),
-                |pattern, target| target.contains(pattern),
+                |pattern, target| pattern.split(",").into_iter().any(|d| d == target),
             ),
         }
     }
