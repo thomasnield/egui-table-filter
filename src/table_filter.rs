@@ -6,6 +6,11 @@
     use egui::{ScrollArea, Id, Popup, PopupCloseBehavior, Response, Key, TextEdit, RichText, Color32};
     use itertools::Itertools;
 
+    pub trait TableFilter<T> {
+        fn check_for_reset(&mut self);
+        fn evaluate(&self, item: &T) -> bool;
+        fn evaluate_array(&self, items: &Vec<T>, exclude_idx: Option<usize>) -> Vec<bool>;
+    }
     pub struct ColumnFilter<T,V: Eq + Hash + Ord> {
         search_field: String,
         unselected_values: HashSet<V>,

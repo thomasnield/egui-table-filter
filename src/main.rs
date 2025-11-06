@@ -8,7 +8,7 @@ use egui::{Id, Label, Sense};
 use egui_extras::{TableBuilder, Column};
 use itertools::Itertools;
 use regex::Regex;
-use crate::table_filter::ColumnFilter;
+use crate::table_filter::{ColumnFilter, TableFilter};
 
 mod table_filter;
 
@@ -52,8 +52,8 @@ struct ColumnFilters {
     gate: ColumnFilter<Flight, String>,
 }
 
-impl ColumnFilters {
-    pub fn check_for_reset(&mut self) {
+impl TableFilter<Flight> for ColumnFilters {
+    fn check_for_reset(&mut self) {
         if self.orig.reset_called() ||
             self.dest.reset_called() ||
             self.mileage.reset_called() ||
@@ -69,7 +69,7 @@ impl ColumnFilters {
             self.gate.reset();
         }
     }
-    pub fn evaluate(&self, flight: &Flight) -> bool {
+    fn evaluate(&self, flight: &Flight) -> bool {
         self.orig.evaluate(&flight) &&
             self.dest.evaluate(&flight) &&
             self.dep_date.evaluate(&flight) &&
@@ -77,7 +77,7 @@ impl ColumnFilters {
             self.cancelled.evaluate(&flight) &&
             self.gate.evaluate(&flight)
     }
-    pub fn evaluate_array(&self, flights: &Vec<Flight>, exclude_idx: usize) -> Vec<bool> {
+    fn evaluate_array(&self, flights: &Vec<Flight>, exclude_idx: Option<usize>) -> Vec<bool> {
         let evals = [
             self.orig.get_eval_bool_array(&flights),
                 self.dest.get_eval_bool_array(&flights),
@@ -94,8 +94,10 @@ impl ColumnFilters {
 
         let mut result = vec![true; len]; // Start with all true
         for (i, eval) in evals.iter().enumerate() {
-            if i == exclude_idx {
-                continue;
+            if let Some(j) = exclude_idx {
+                if i == j {
+                    continue;
+                }
             }
             for (r, &b) in result.iter_mut().zip(eval.iter()) {
                 *r &= b;
@@ -277,7 +279,7 @@ impl App for TableFilterApp {
                         Id::new("orig_filter"),
                         orig_resp,
                         &self.flights,
-                        &self.column_filters.evaluate_array(&self.flights, 0)
+                        &self.column_filters.evaluate_array(&self.flights, Some(0))
                     );
 
                     let (_, dest_resp) = header.col(|ui| {
@@ -290,7 +292,7 @@ impl App for TableFilterApp {
                         Id::new("dest_filter"),
                         dest_resp,
                         &self.flights,
-                        &self.column_filters.evaluate_array(&self.flights,1)
+                        &self.column_filters.evaluate_array(&self.flights,Some(1))
                     );
 
                     let (_, dep_date_resp) = header.col(|ui| {
@@ -303,7 +305,7 @@ impl App for TableFilterApp {
                         Id::new("dep_date_filter"),
                         dep_date_resp,
                         &self.flights,
-                        &self.column_filters.evaluate_array(&self.flights, 2)
+                        &self.column_filters.evaluate_array(&self.flights, Some(2))
                     );
 
                     let (_, mileage_resp) = header.col(|ui| {
@@ -316,7 +318,7 @@ impl App for TableFilterApp {
                         Id::new("mileage_filter"),
                         mileage_resp,
                         &self.flights,
-                        &self.column_filters.evaluate_array(&self.flights, 3)
+                        &self.column_filters.evaluate_array(&self.flights, Some(3))
                     );
 
                     let (_, cancelled_resp) = header.col(|ui| {
@@ -329,7 +331,7 @@ impl App for TableFilterApp {
                         Id::new("cancelled_filter"),
                         cancelled_resp,
                         &self.flights,
-                        &self.column_filters.evaluate_array(&self.flights, 4)
+                        &self.column_filters.evaluate_array(&self.flights, Some(4))
                     );
 
                     let (_, gate_resp) = header.col(|ui| {
@@ -342,7 +344,7 @@ impl App for TableFilterApp {
                         Id::new("gate_filter"),
                         gate_resp,
                         &self.flights,
-                        &self.column_filters.evaluate_array(&self.flights, 5)
+                        &self.column_filters.evaluate_array(&self.flights, Some(5))
                     );
                 })
                 .body(|mut body| {
