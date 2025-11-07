@@ -8,12 +8,14 @@ use egui::{Id, Label, Sense};
 use egui_extras::{TableBuilder, Column};
 use itertools::Itertools;
 use regex::Regex;
+use crate::data::generate_random_flights;
 use crate::table_filter::{ColumnFilter, TableFilter};
 
 mod table_filter;
+mod data;
 
 #[derive(Clone)]
-struct Flight {
+pub struct Flight {
     number: u32,
     orig: String,
     dest: String,
@@ -226,22 +228,7 @@ impl Default for ColumnFilters {
 impl Default for TableFilterApp {
     fn default() -> Self {
         Self {
-            flights: vec![
-                Flight { number: 567, orig: "ABQ".to_string(), dest: "DAL".to_string(), dep_date: NaiveDate::from_ymd_opt(2015, 5, 8).unwrap(), mileage: 642, cancelled: false, gate: Some("23".to_string()) },
-                Flight { number: 234, orig: "ABQ".to_string(), dest: "DAL".to_string(), dep_date: NaiveDate::from_ymd_opt(2015, 5, 9).unwrap(), mileage: 642, cancelled: false, gate: Some("13".to_string()) },
-                Flight { number: 756, orig: "ABQ".to_string(), dest: "DAL".to_string(), dep_date: NaiveDate::from_ymd_opt(2015, 5, 11).unwrap(), mileage: 642, cancelled: false, gate: Some("9".to_string()) },
-                Flight { number: 268, orig: "ABQ".to_string(), dest: "DAL".to_string(), dep_date: NaiveDate::from_ymd_opt(2015, 5, 13).unwrap(), mileage: 642, cancelled: false, gate: Some("2".to_string()) },
-                Flight { number: 567, orig: "DAL".to_string(), dest: "HOU".to_string(), dep_date: NaiveDate::from_ymd_opt(2015, 5, 8).unwrap(), mileage: 244, cancelled: false, gate: Some("A5".to_string()) },
-                Flight { number: 239, orig: "DAL".to_string(), dest: "HOU".to_string(), dep_date: NaiveDate::from_ymd_opt(2015, 5, 14).unwrap(), mileage: 244, cancelled: false, gate: Some("B4".to_string()) },
-                Flight { number: 5923, orig: "DAL".to_string(), dest: "HOU".to_string(), dep_date: NaiveDate::from_ymd_opt(2015, 5, 17).unwrap(), mileage: 244, cancelled: false, gate: Some("C3".to_string()) },
-                Flight { number: 2389, orig: "DAL".to_string(), dest: "HOU".to_string(), dep_date: NaiveDate::from_ymd_opt(2015, 5, 6).unwrap(), mileage: 244, cancelled: false, gate: None },
-                Flight { number: 287, orig: "SEA".to_string(), dest: "PHX".to_string(), dep_date: NaiveDate::from_ymd_opt(2015, 5, 8).unwrap(), mileage: 1100, cancelled: false, gate: None },
-                Flight { number: 875, orig: "SEA".to_string(), dest: "PHX".to_string(), dep_date: NaiveDate::from_ymd_opt(2015, 5, 16).unwrap(), mileage: 1100, cancelled: false, gate: Some("12".to_string()) },
-                Flight { number: 4288, orig: "SEA".to_string(), dest: "PHX".to_string(), dep_date: NaiveDate::from_ymd_opt(2015, 5, 9).unwrap(), mileage: 1100, cancelled: false, gate: Some("19".to_string()) },
-                Flight { number: 567, orig: "BWI".to_string(), dest: "MCO".to_string(), dep_date: NaiveDate::from_ymd_opt(2015, 7, 9).unwrap(), mileage: 898, cancelled: false, gate: Some("45".to_string()) },
-                Flight { number: 234, orig: "MDW".to_string(), dest: "PDX".to_string(), dep_date: NaiveDate::from_ymd_opt(2015, 7, 12).unwrap(), mileage: 2118, cancelled: false, gate: Some("B9".to_string()) },
-                Flight { number: 411, orig: "SAN".to_string(), dest: "JFK".to_string(), dep_date: NaiveDate::from_ymd_opt(2015, 7, 19).unwrap(), mileage: 2077, cancelled: false, gate: None },
-            ],
+            flights: generate_random_flights(1_000), // TODO: explore performance concerns for larger number of records
             column_filters: Default::default(),
         }
     }
