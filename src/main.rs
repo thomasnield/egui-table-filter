@@ -1,5 +1,4 @@
 use std::any::Any;
-use std::collections::HashSet;
 use std::error::Error;
 use eframe::egui;
 use eframe::App;
@@ -8,7 +7,7 @@ use egui::{Id, Label, Sense};
 use egui_extras::{TableBuilder, Column};
 use itertools::Itertools;
 use regex::Regex;
-use crate::table_filter::{ColumnFilter, TableFilter};
+use crate::table_filter::{ColumnFilterImpl, ColumnFilter, TableFilterImpl};
 
 mod table_filter;
 
@@ -44,15 +43,15 @@ struct TableFilterApp {
 }
 
 struct ColumnFilters {
-    orig: ColumnFilter<Flight, String>,
-    dest: ColumnFilter<Flight, String>,
-    dep_date: ColumnFilter<Flight, String>,
-    mileage: ColumnFilter<Flight, u32>,
-    cancelled: ColumnFilter<Flight, bool>,
-    gate: ColumnFilter<Flight, String>,
+    orig: ColumnFilterImpl<Flight, String>,
+    dest: ColumnFilterImpl<Flight, String>,
+    dep_date: ColumnFilterImpl<Flight, String>,
+    mileage: ColumnFilterImpl<Flight, u32>,
+    cancelled: ColumnFilterImpl<Flight, bool>,
+    gate: ColumnFilterImpl<Flight, String>,
 }
 
-impl TableFilter<Flight> for ColumnFilters {
+impl TableFilterImpl<Flight> for ColumnFilters {
     fn check_for_reset(&mut self) {
         if self.orig.reset_called() ||
             self.dest.reset_called() ||
@@ -110,17 +109,17 @@ impl TableFilter<Flight> for ColumnFilters {
 impl Default for ColumnFilters {
     fn default() -> Self {
         Self {
-            orig: ColumnFilter::new(
+            orig: ColumnFilterImpl::new(
                 |flt: &Flight| flt.orig.clone(),
                 |flt| flt.orig.clone(),
                 |pattern, target| target.starts_with(pattern),
             ),
-            dest: ColumnFilter::new(
+            dest: ColumnFilterImpl::new(
                 |flt: &Flight| flt.dest.clone(),
                 |flt| flt.dest.clone(),
                 |pattern, target| target.starts_with(pattern),
             ),
-            dep_date: ColumnFilter::new(
+            dep_date: ColumnFilterImpl::new(
                 |flt: &Flight| flt.dep_date.format("%m/%d/%Y").to_string(),
                 |flt| flt.dep_date.format("%m/%d/%Y").to_string(),
                 |pattern, target|  {
@@ -165,7 +164,7 @@ impl Default for ColumnFilters {
                     }
                 },
             ),
-            mileage: ColumnFilter::new(
+            mileage: ColumnFilterImpl::new(
                 |flt: &Flight| flt.mileage,
                 |flt| flt.mileage.to_string(),
                 |pattern, target|
@@ -209,12 +208,12 @@ impl Default for ColumnFilters {
                     }
                 ,
             ),
-            cancelled: ColumnFilter::new(
+            cancelled: ColumnFilterImpl::new(
                 |flt: &Flight| flt.cancelled,
                 |flt| if flt.cancelled { "Yes".to_string() } else { "No".to_string() },
                 |pattern, target| target.contains(pattern),
             ),
-            gate: ColumnFilter::new(
+            gate: ColumnFilterImpl::new(
                 |flt: &Flight| flt.gate.clone().unwrap_or("N/A".to_string()),
                 |flt| flt.gate.clone().unwrap_or("N/A".to_string()),
                 |pattern, target| pattern.split(",").into_iter().any(|d| d == target),

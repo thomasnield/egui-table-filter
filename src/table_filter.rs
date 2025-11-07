@@ -4,14 +4,74 @@
     use std::ops::Deref;
     use eframe::emath::RectAlign;
     use egui::{ScrollArea, Id, Popup, PopupCloseBehavior, Response, Key, TextEdit, RichText, Color32};
+
     use itertools::Itertools;
 
-    pub trait TableFilter<T> {
+    pub trait TableFilterImpl<T> {
         fn check_for_reset(&mut self);
         fn evaluate(&self, item: &T) -> bool;
         fn evaluate_array(&self, items: &Vec<T>, exclude_idx: Option<usize>) -> Vec<bool>;
     }
-    pub struct ColumnFilter<T,V: Eq + Hash + Ord> {
+
+    pub struct TableFilter<T> {
+        column_filters: Vec<Box<dyn ColumnFilter<T>>>
+    }
+
+    impl <T: 'static> TableFilter<T> {
+        pub fn add<V: Eq + Hash + Ord + 'static>(
+            &mut self,
+            get_value: impl Fn(&T) -> V + 'static,
+            get_string_value: impl Fn(&T) -> String + 'static,
+            str_search_op: impl  Fn(&String,&String) -> bool + 'static
+        ) {
+            self.column_filters.push(Box::new(ColumnFilterImpl::new(
+                get_value,
+                get_string_value,
+                str_search_op
+            )));
+        }
+    }
+    impl <T> TableFilterImpl<T> for TableFilter<T> {
+        fn check_for_reset(&mut self) {
+            if self.column_filters.iter().any(|cf| cf.reset_called()) {
+                self.column_filters.iter_mut().for_each(|cf| cf.reset());
+            }
+        }
+
+        fn evaluate(&self, item: &T) -> bool {
+            self.column_filters.iter().all(|cf| cf.evaluate(item))
+        }
+
+        fn evaluate_array(&self, items: &Vec<T>, exclude_idx: Option<usize>) -> Vec<bool> {
+            let evals: Vec<Vec<bool>> = self.column_filters.iter().map(|cf| cf.get_eval_bool_array(items)).collect();
+
+            assert!(!evals.is_empty());
+            let len = evals[0].len();
+            // Defensive check: ensure all have same length
+            assert!(evals.iter().all(|v| v.len() == len));
+
+            let mut result = vec![true; len]; // Start with all true
+            for (i, eval) in evals.iter().enumerate() {
+                if let Some(j) = exclude_idx {
+                    if i == j {
+                        continue;
+                    }
+                }
+                for (r, &b) in result.iter_mut().zip(eval.iter()) {
+                    *r &= b;
+                }
+            }
+            result
+        }
+    }
+
+    pub trait ColumnFilter<T> {
+        fn evaluate(&self, t: &T) -> bool;
+        fn get_eval_bool_array(&self, data: &Vec<T>) -> Vec<bool>;
+        fn reset(&mut self);
+        fn reset_called(&self) -> bool;
+    }
+    pub struct ColumnFilterImpl<T,V: Eq + Hash + Ord> {
         search_field: String,
         unselected_values: HashSet<V>,
         get_value: Box<dyn Fn(&T) -> V>,
@@ -24,7 +84,26 @@
         select_none_clicked: bool
     }
 
-    impl <T,V: Eq + Hash + Ord> ColumnFilter<T,V> {
+    impl <T,V: Eq + Hash + Ord> ColumnFilter<T> for ColumnFilterImpl<T,V> {
+        fn evaluate(&self, t: &T) -> bool {
+            let f = self.get_value.deref();
+            !self.unselected_values.contains(&f(t))
+        }
+        fn get_eval_bool_array(&self, data: &Vec<T>) -> Vec<bool> {
+            data.iter()
+                .map(|t| self.evaluate(t))
+                .collect()
+        }
+        fn reset(&mut self) {
+            self.search_field.clear();
+            self.unselected_values.clear();
+            self.reset_button_clicked = false;
+        }
+        fn reset_called(&self) -> bool {
+            self.reset_button_clicked
+        }
+    }
+    impl <T,V: Eq + Hash + Ord> ColumnFilterImpl<T,V> {
         pub fn new(get_value: impl Fn(&T) -> V + 'static,
                    get_string_value: impl Fn(&T) -> String + 'static,
                    str_search_op: impl  Fn(&String,&String) -> bool + 'static) -> Self {
@@ -54,33 +133,18 @@
         }
     }
 
-    impl <T,V: Eq + Hash + Ord + std::fmt::Display> ColumnFilter<T,V> {
+    impl <T,V: Eq + Hash + Ord + std::fmt::Display> ColumnFilterImpl<T,V> {
 
-        pub fn evaluate(&self, t: &T) -> bool {
-            let f = self.get_value.deref();
-            !self.unselected_values.contains(&f(t))
-        }
-        pub fn get_eval_bool_array(&self, data: &Vec<T>) -> Vec<bool> {
-            data.iter()
-                .map(|t| self.evaluate(t))
-                .collect()
-        }
+
         pub fn contains(&self, value: &V) -> bool {
             !self.unselected_values.contains(value)
         }
-        pub fn reset_called(&self) -> bool {
-            self.reset_button_clicked
-        }
-        pub fn reset(&mut self) {
-            self.search_field.clear();
-            self.unselected_values.clear();
-            self.reset_button_clicked = false;
-        }
+
 
         pub fn bind(&mut self, id: Id,
                     response: Response,
                     data: &Vec<T>,
-                    filter_array: &Vec<bool>
+                    filter_array: Vec<bool>
         )  {
 
             // add popup
@@ -113,7 +177,7 @@
 
                                     let visible_unique: HashSet<V> = zip(data, filter_array)
                                         .map(|(d, b)| (self.get_value(d),b))
-                                        .filter(|(d,b)| **b)
+                                        .filter(|(d,b)| *b)
                                         .map(|(d,b)| d)
                                         .collect();
 
