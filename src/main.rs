@@ -1,6 +1,6 @@
 use std::any::Any;
+use std::collections::HashSet;
 use std::error::Error;
-use std::io::BufRead;
 use eframe::egui;
 use eframe::App;
 use chrono::NaiveDate;
@@ -8,12 +8,14 @@ use egui::{Id, Label, Sense};
 use egui_extras::{TableBuilder, Column};
 use itertools::Itertools;
 use regex::Regex;
-use crate::table_filter::{ColumnFilterImpl, ColumnFilter, TableFilterImpl, TableFilter};
+use crate::data::generate_random_flights;
+use crate::table_filter::{ColumnFilter, TableFilter};
 
 mod table_filter;
+mod data;
 
 #[derive(Clone)]
-struct Flight {
+pub struct Flight {
     number: u32,
     orig: String,
     dest: String,
@@ -40,144 +42,194 @@ fn main() -> eframe::Result {
 
 struct TableFilterApp {
     flights: Vec<Flight>,
-    table_filter: TableFilter<Flight>,
+    column_filters: ColumnFilters,
+}
+
+struct ColumnFilters {
+    orig: ColumnFilter<Flight, String>,
+    dest: ColumnFilter<Flight, String>,
+    dep_date: ColumnFilter<Flight, String>,
+    mileage: ColumnFilter<Flight, u32>,
+    cancelled: ColumnFilter<Flight, bool>,
+    gate: ColumnFilter<Flight, String>,
+}
+
+impl TableFilter<Flight> for ColumnFilters {
+    fn check_for_reset(&mut self) {
+        if self.orig.reset_called() ||
+            self.dest.reset_called() ||
+            self.mileage.reset_called() ||
+            self.dep_date.reset_called() ||
+            self.cancelled.reset_called() ||
+            self.gate.reset_called() {
+
+            self.orig.reset();
+            self.dest.reset();
+            self.mileage.reset();
+            self.dep_date.reset();
+            self.cancelled.reset();
+            self.gate.reset();
+        }
+    }
+    fn evaluate(&self, flight: &Flight) -> bool {
+        self.orig.evaluate(&flight) &&
+            self.dest.evaluate(&flight) &&
+            self.dep_date.evaluate(&flight) &&
+            self.mileage.evaluate(&flight) &&
+            self.cancelled.evaluate(&flight) &&
+            self.gate.evaluate(&flight)
+    }
+    fn evaluate_array(&self, flights: &Vec<Flight>, exclude_idx: Option<usize>) -> Vec<bool> {
+        let evals = [
+            self.orig.get_eval_bool_array(&flights),
+                self.dest.get_eval_bool_array(&flights),
+                self.dep_date.get_eval_bool_array(&flights),
+                self.mileage.get_eval_bool_array(&flights),
+                self.cancelled.get_eval_bool_array(&flights),
+                self.gate.get_eval_bool_array(&flights)
+        ];
+
+        assert!(!evals.is_empty());
+        let len = evals[0].len();
+        // Defensive check: ensure all have same length
+        assert!(evals.iter().all(|v| v.len() == len));
+
+        let mut result = vec![true; len]; // Start with all true
+        for (i, eval) in evals.iter().enumerate() {
+            if let Some(j) = exclude_idx {
+                if i == j {
+                    continue;
+                }
+            }
+            for (r, &b) in result.iter_mut().zip(eval.iter()) {
+                *r &= b;
+            }
+        }
+        result
+    }
+}
+
+impl Default for ColumnFilters {
+    fn default() -> Self {
+        Self {
+            orig: ColumnFilter::new(
+                |flt: &Flight| flt.orig.clone(),
+                |flt| flt.orig.clone(),
+                |pattern, target| target.starts_with(pattern),
+            ),
+            dest: ColumnFilter::new(
+                |flt: &Flight| flt.dest.clone(),
+                |flt| flt.dest.clone(),
+                |pattern, target| target.starts_with(pattern),
+            ),
+            dep_date: ColumnFilter::new(
+                |flt: &Flight| flt.dep_date.format("%m/%d/%Y").to_string(),
+                |flt| flt.dep_date.format("%m/%d/%Y").to_string(),
+                |pattern, target|  {
+
+                    return if Regex::new("[0-9]{1,2}/[0-9]{2}/[0-9]{4}><[0-9]{1,2}/[0-9]{2}/[0-9]{4}").unwrap().is_match(pattern) {
+                        let (dt_left,dt_right) = pattern.split("><").collect_tuple().unwrap();
+
+                        let dt_left = NaiveDate::parse_from_str(&dt_left, "%m/%d/%Y");
+                        let dt_right = NaiveDate::parse_from_str(&dt_right, "%m/%d/%Y");
+                        let dt = NaiveDate::parse_from_str(target, "%m/%d/%Y");
+
+                        if let Ok(dt_left) = dt_left {
+                            if let Ok(dt_right) = dt_right {
+                                if let Ok(dt) = dt {
+                                    dt_left <= dt && dt <= dt_right
+                                } else {
+                                    false
+                                }
+                            } else { false }
+                        } else { false }
+                    }
+                    else if Regex::new("<[0-9]{1,2}/[0-9]{2}/[0-9]{4}").unwrap().is_match(pattern) {
+                        let p = pattern.replace("<", "");
+
+                        if let Ok(p) = NaiveDate::parse_from_str(&p, "%m/%d/%Y") {
+                            if let Ok(s) = NaiveDate::parse_from_str(&target, "%m/%d/%Y") {
+                                s <= p
+                            } else { false }
+                        } else { false }
+                    } else if Regex::new(">[0-9]{1,2}/[0-9]{2}/[0-9]{4}").unwrap().is_match(pattern) {
+
+                        let p = pattern.replace(">", "");
+
+                        if let Ok(p) = NaiveDate::parse_from_str(&p, "%m/%d/%Y") {
+                            if let Ok(s) = NaiveDate::parse_from_str(&target, "%m/%d/%Y") {
+                                s >= p
+                            } else { false }
+                        } else { false }
+                    }
+                    else {
+                        target.starts_with(pattern)
+                    }
+                },
+            ),
+            mileage: ColumnFilter::new(
+                |flt: &Flight| flt.mileage,
+                |flt| flt.mileage.to_string(),
+                |pattern, target|
+                    return if Regex::new("[0-9]+><[0-9]+").unwrap().is_match(pattern) {
+                        let (int_left, int_right) = pattern.split("><").collect_tuple().unwrap();
+
+                        let u_left = int_left.parse::<usize>();
+                        let u_right = int_right.parse::<usize>();
+                        let u = target.parse::<usize>();
+
+                        if let Ok(u_left) = u_left {
+                            if let Ok(u_right) = u_right {
+                                if let Ok(u) = u {
+                                    u_left <= u && u <= u_right
+                                } else {
+                                    false
+                                }
+                            } else { false }
+                        } else { false }
+                    }
+                    else if Regex::new("<[0-9]+").unwrap().is_match(pattern) {
+                        let p = pattern.replace("<", "");
+
+                        if let Ok(p) = p.parse::<usize>() {
+                            if let Ok(s) = target.parse::<usize>() {
+                                s <= p
+                            } else { false }
+                        } else { false }
+                    } else if Regex::new(">[0-9]+").unwrap().is_match(pattern) {
+
+                        let p = pattern.replace(">", "");
+
+                        if let Ok(p) = p.parse::<usize>() {
+                            if let Ok(s) = target.parse::<usize>() {
+                                s >= p
+                            } else { false }
+                        } else { false }
+                    }
+                    else {
+                        target.starts_with(pattern)
+                    }
+                ,
+            ),
+            cancelled: ColumnFilter::new(
+                |flt: &Flight| flt.cancelled,
+                |flt| if flt.cancelled { "Yes".to_string() } else { "No".to_string() },
+                |pattern, target| target.contains(pattern),
+            ),
+            gate: ColumnFilter::new(
+                |flt: &Flight| flt.gate.clone().unwrap_or("N/A".to_string()),
+                |flt| flt.gate.clone().unwrap_or("N/A".to_string()),
+                |pattern, target| pattern.split(",").into_iter().any(|d| d == target),
+            ),
+        }
+    }
 }
 
 impl Default for TableFilterApp {
     fn default() -> Self {
         Self {
-            flights: vec![
-                Flight { number: 567, orig: "ABQ".to_string(), dest: "DAL".to_string(), dep_date: NaiveDate::from_ymd_opt(2015, 5, 8).unwrap(), mileage: 642, cancelled: false, gate: Some("23".to_string()) },
-                Flight { number: 234, orig: "ABQ".to_string(), dest: "DAL".to_string(), dep_date: NaiveDate::from_ymd_opt(2015, 5, 9).unwrap(), mileage: 642, cancelled: false, gate: Some("13".to_string()) },
-                Flight { number: 756, orig: "ABQ".to_string(), dest: "DAL".to_string(), dep_date: NaiveDate::from_ymd_opt(2015, 5, 11).unwrap(), mileage: 642, cancelled: false, gate: Some("9".to_string()) },
-                Flight { number: 268, orig: "ABQ".to_string(), dest: "DAL".to_string(), dep_date: NaiveDate::from_ymd_opt(2015, 5, 13).unwrap(), mileage: 642, cancelled: false, gate: Some("2".to_string()) },
-                Flight { number: 567, orig: "DAL".to_string(), dest: "HOU".to_string(), dep_date: NaiveDate::from_ymd_opt(2015, 5, 8).unwrap(), mileage: 244, cancelled: false, gate: Some("A5".to_string()) },
-                Flight { number: 239, orig: "DAL".to_string(), dest: "HOU".to_string(), dep_date: NaiveDate::from_ymd_opt(2015, 5, 14).unwrap(), mileage: 244, cancelled: false, gate: Some("B4".to_string()) },
-                Flight { number: 5923, orig: "DAL".to_string(), dest: "HOU".to_string(), dep_date: NaiveDate::from_ymd_opt(2015, 5, 17).unwrap(), mileage: 244, cancelled: false, gate: Some("C3".to_string()) },
-                Flight { number: 2389, orig: "DAL".to_string(), dest: "HOU".to_string(), dep_date: NaiveDate::from_ymd_opt(2015, 5, 6).unwrap(), mileage: 244, cancelled: false, gate: None },
-                Flight { number: 287, orig: "SEA".to_string(), dest: "PHX".to_string(), dep_date: NaiveDate::from_ymd_opt(2015, 5, 8).unwrap(), mileage: 1100, cancelled: false, gate: None },
-                Flight { number: 875, orig: "SEA".to_string(), dest: "PHX".to_string(), dep_date: NaiveDate::from_ymd_opt(2015, 5, 16).unwrap(), mileage: 1100, cancelled: false, gate: Some("12".to_string()) },
-                Flight { number: 4288, orig: "SEA".to_string(), dest: "PHX".to_string(), dep_date: NaiveDate::from_ymd_opt(2015, 5, 9).unwrap(), mileage: 1100, cancelled: false, gate: Some("19".to_string()) },
-                Flight { number: 567, orig: "BWI".to_string(), dest: "MCO".to_string(), dep_date: NaiveDate::from_ymd_opt(2015, 7, 9).unwrap(), mileage: 898, cancelled: false, gate: Some("45".to_string()) },
-                Flight { number: 234, orig: "MDW".to_string(), dest: "PDX".to_string(), dep_date: NaiveDate::from_ymd_opt(2015, 7, 12).unwrap(), mileage: 2118, cancelled: false, gate: Some("B9".to_string()) },
-                Flight { number: 411, orig: "SAN".to_string(), dest: "JFK".to_string(), dep_date: NaiveDate::from_ymd_opt(2015, 7, 19).unwrap(), mileage: 2077, cancelled: false, gate: None },
-            ],
-            table_filter: TableFilter::new()
-                .add_column(
-                    Id::from("orig_filter"),
-                    |flt: &Flight| flt.orig.clone(),
-                    |flt| flt.orig.clone(),
-                    |pattern, target| target.starts_with(pattern)
-                )
-                .add_column(
-                    Id::from("dest_filter"),
-                    |flt: &Flight| flt.dest.clone(),
-                    |flt| flt.dest.clone(),
-                    |pattern, target| target.starts_with(pattern),
-                )
-                .add_column(
-                    Id::from("dep_date_filter"),
-                    |flt: &Flight| flt.dep_date.format("%m/%d/%Y").to_string(),
-                    |flt| flt.dep_date.format("%m/%d/%Y").to_string(),
-                    |pattern, target|  {
-
-                        return if Regex::new("[0-9]{1,2}/[0-9]{2}/[0-9]{4}><[0-9]{1,2}/[0-9]{2}/[0-9]{4}").unwrap().is_match(pattern) {
-                            let (dt_left,dt_right) = pattern.split("><").collect_tuple().unwrap();
-
-                            let dt_left = NaiveDate::parse_from_str(&dt_left, "%m/%d/%Y");
-                            let dt_right = NaiveDate::parse_from_str(&dt_right, "%m/%d/%Y");
-                            let dt = NaiveDate::parse_from_str(target, "%m/%d/%Y");
-
-                            if let Ok(dt_left) = dt_left {
-                                if let Ok(dt_right) = dt_right {
-                                    if let Ok(dt) = dt {
-                                        dt_left <= dt && dt <= dt_right
-                                    } else {
-                                        false
-                                    }
-                                } else { false }
-                            } else { false }
-                        }
-                        else if Regex::new("<[0-9]{1,2}/[0-9]{2}/[0-9]{4}").unwrap().is_match(pattern) {
-                            let p = pattern.replace("<", "");
-
-                            if let Ok(p) = NaiveDate::parse_from_str(&p, "%m/%d/%Y") {
-                                if let Ok(s) = NaiveDate::parse_from_str(&target, "%m/%d/%Y") {
-                                    s <= p
-                                } else { false }
-                            } else { false }
-                        } else if Regex::new(">[0-9]{1,2}/[0-9]{2}/[0-9]{4}").unwrap().is_match(pattern) {
-
-                            let p = pattern.replace(">", "");
-
-                            if let Ok(p) = NaiveDate::parse_from_str(&p, "%m/%d/%Y") {
-                                if let Ok(s) = NaiveDate::parse_from_str(&target, "%m/%d/%Y") {
-                                    s >= p
-                                } else { false }
-                            } else { false }
-                        }
-                        else {
-                            target.starts_with(pattern)
-                        }
-                    }
-                )
-                .add_column(
-                    Id::from("mileage_filter"),
-                    |flt: &Flight| flt.mileage,
-                    |flt| flt.mileage.to_string(),
-                    |pattern, target| {
-                        return if Regex::new("[0-9]+><[0-9]+").unwrap().is_match(pattern) {
-                            let (int_left, int_right) = pattern.split("><").collect_tuple().unwrap();
-
-                            let u_left = int_left.parse::<usize>();
-                            let u_right = int_right.parse::<usize>();
-                            let u = target.parse::<usize>();
-
-                            if let Ok(u_left) = u_left {
-                                if let Ok(u_right) = u_right {
-                                    if let Ok(u) = u {
-                                        u_left <= u && u <= u_right
-                                    } else {
-                                        false
-                                    }
-                                } else { false }
-                            } else { false }
-                        }
-                        else if Regex::new("<[0-9]+").unwrap().is_match(pattern) {
-                            let p = pattern.replace("<", "");
-
-                            if let Ok(p) = p.parse::<usize>() {
-                                if let Ok(s) = target.parse::<usize>() {
-                                    s <= p
-                                } else { false }
-                            } else { false }
-                        } else if Regex::new(">[0-9]+").unwrap().is_match(pattern) {
-
-                            let p = pattern.replace(">", "");
-
-                            if let Ok(p) = p.parse::<usize>() {
-                                if let Ok(s) = target.parse::<usize>() {
-                                    s >= p
-                                } else { false }
-                            } else { false }
-                        }
-                        else {
-                            target.starts_with(pattern)
-                        }
-                    }
-                )
-                .add_column(
-                    Id::from("cancelled_filter"),
-                    |flt: &Flight| flt.cancelled,
-                    |flt| if flt.cancelled { "Yes".to_string() } else { "No".to_string() },
-                    |pattern, target| target.contains(pattern)
-                )
-                .add_column(
-                    Id::from("gate_filter"),
-                    |flt: &Flight| flt.gate.clone().unwrap_or("N/A".to_string()),
-                    |flt| flt.gate.clone().unwrap_or("N/A".to_string()),
-                    |pattern, target| pattern.split(",").into_iter().any(|d| d == target),
-                )
+            flights: generate_random_flights(1_000), // TODO: explore performance concerns for larger number of records
+            column_filters: Default::default(),
         }
     }
 }
@@ -190,7 +242,7 @@ impl App for TableFilterApp {
             ui.style_mut().interaction.selectable_labels = false;
 
             // check for filter reset
-            self.table_filter.check_for_reset();
+            self.column_filters.check_for_reset();
 
             TableBuilder::new(ui)
                 .striped(true)
