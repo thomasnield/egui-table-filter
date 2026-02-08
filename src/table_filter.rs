@@ -117,11 +117,6 @@
         fn reset(&self) {
             self.column_filter_state().search_field.borrow_mut().clear();
             self.column_filter_state().unselected_values.borrow_mut().clear();
-
-            self.column_filter_state().table_filter
-                .column_filters.borrow().iter()
-                .filter(|cf| cf.id() != self.id())
-                .for_each(|cf| cf.reset());
         }
 
         fn contains(&self, value: &ScalarValue) -> bool {
