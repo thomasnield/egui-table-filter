@@ -168,9 +168,7 @@ impl Default for ColumnFilters {
 impl Default for TableFilterApp {
     fn default() -> Self {
         let flights = Rc::new(generate_random_flights(1_000));
-        
         let table_filter = Rc::new(TableFilter::new(&flights));
-        let mut filters: Vec<Box<dyn ColumnFilter<Flight>>> = Vec::new();
 
         // ORIG FILTER
         {
@@ -183,7 +181,7 @@ impl Default for TableFilterApp {
                 fn column_filter_state(&self) -> &ColumnFilterState<Flight> { &self.column_filter_state }
             }
 
-            filters.push(Box::new(
+            table_filter.add_column(Box::new(
                 OrigColumnFilter { column_filter_state: ColumnFilterState::new(&table_filter) }
             ));
         }
@@ -199,13 +197,9 @@ impl Default for TableFilterApp {
                 fn column_filter_state(&self) -> &ColumnFilterState<Flight> { &self.column_filter_state }
             }
 
-            filters.push(Box::new(
+            table_filter.add_column(Box::new(
                 DestColumnFilter { column_filter_state: ColumnFilterState::new(&table_filter) }
             ));
-
-            filters.into_iter().for_each(|filter| {
-                table_filter.add_column(filter);
-            })
         }
 
         Self {
