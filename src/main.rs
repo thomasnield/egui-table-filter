@@ -1,15 +1,15 @@
 use std::any::Any;
 use std::collections::HashSet;
 use std::error::Error;
+use std::rc::Rc;
 use eframe::egui;
 use eframe::App;
 use chrono::NaiveDate;
-use egui::{Id, Label, Sense};
+use egui::{Id, Sense};
 use egui_extras::{TableBuilder, Column};
 use itertools::Itertools;
-use regex::Regex;
 use crate::data::generate_random_flights;
-use crate::table_filter::{ColumnFilter, TableFilter};
+use crate::table_filter::{ColumnFilter, ColumnFilterState, ScalarValue, TableFilter};
 
 mod table_filter;
 mod data;
@@ -41,88 +41,25 @@ fn main() -> eframe::Result {
 }
 
 struct TableFilterApp {
-    flights: Vec<Flight>,
-    column_filters: ColumnFilters,
+    flights: Rc<Vec<Flight>>,
+    table_filter: Rc<TableFilter<Flight>>,
 }
 
-struct ColumnFilters {
-    orig: ColumnFilter<Flight, String>,
-    dest: ColumnFilter<Flight, String>,
-    dep_date: ColumnFilter<Flight, String>,
-    mileage: ColumnFilter<Flight, u32>,
-    cancelled: ColumnFilter<Flight, bool>,
-    gate: ColumnFilter<Flight, String>,
-}
-
-impl TableFilter<Flight> for ColumnFilters {
-    fn check_for_reset(&mut self) {
-        if self.orig.reset_called() ||
-            self.dest.reset_called() ||
-            self.mileage.reset_called() ||
-            self.dep_date.reset_called() ||
-            self.cancelled.reset_called() ||
-            self.gate.reset_called() {
-
-            self.orig.reset();
-            self.dest.reset();
-            self.mileage.reset();
-            self.dep_date.reset();
-            self.cancelled.reset();
-            self.gate.reset();
-        }
-    }
-    fn evaluate(&self, flight: &Flight) -> bool {
-        self.orig.evaluate(&flight) &&
-            self.dest.evaluate(&flight) &&
-            self.dep_date.evaluate(&flight) &&
-            self.mileage.evaluate(&flight) &&
-            self.cancelled.evaluate(&flight) &&
-            self.gate.evaluate(&flight)
-    }
-    fn evaluate_array(&self, flights: &Vec<Flight>, exclude_idx: Option<usize>) -> Vec<bool> {
-        let evals = [
-            self.orig.get_eval_bool_array(&flights),
-                self.dest.get_eval_bool_array(&flights),
-                self.dep_date.get_eval_bool_array(&flights),
-                self.mileage.get_eval_bool_array(&flights),
-                self.cancelled.get_eval_bool_array(&flights),
-                self.gate.get_eval_bool_array(&flights)
-        ];
-
-        assert!(!evals.is_empty());
-        let len = evals[0].len();
-        // Defensive check: ensure all have same length
-        assert!(evals.iter().all(|v| v.len() == len));
-
-        let mut result = vec![true; len]; // Start with all true
-        for (i, eval) in evals.iter().enumerate() {
-            if let Some(j) = exclude_idx {
-                if i == j {
-                    continue;
-                }
-            }
-            for (r, &b) in result.iter_mut().zip(eval.iter()) {
-                *r &= b;
-            }
-        }
-        result
-    }
-}
-
+/*
 impl Default for ColumnFilters {
     fn default() -> Self {
         Self {
-            orig: ColumnFilter::new(
+            orig: ColumnFilterBridge::new(
                 |flt: &Flight| flt.orig.clone(),
                 |flt| flt.orig.clone(),
                 |pattern, target| target.starts_with(pattern),
             ),
-            dest: ColumnFilter::new(
+            dest: ColumnFilterBridge::new(
                 |flt: &Flight| flt.dest.clone(),
                 |flt| flt.dest.clone(),
                 |pattern, target| target.starts_with(pattern),
             ),
-            dep_date: ColumnFilter::new(
+            dep_date: ColumnFilterBridge::new(
                 |flt: &Flight| flt.dep_date.format("%m/%d/%Y").to_string(),
                 |flt| flt.dep_date.format("%m/%d/%Y").to_string(),
                 |pattern, target|  {
@@ -167,7 +104,7 @@ impl Default for ColumnFilters {
                     }
                 },
             ),
-            mileage: ColumnFilter::new(
+            mileage: ColumnFilterBridge::new(
                 |flt: &Flight| flt.mileage,
                 |flt| flt.mileage.to_string(),
                 |pattern, target|
@@ -211,12 +148,12 @@ impl Default for ColumnFilters {
                     }
                 ,
             ),
-            cancelled: ColumnFilter::new(
+            cancelled: ColumnFilterBridge::new(
                 |flt: &Flight| flt.cancelled,
                 |flt| if flt.cancelled { "Yes".to_string() } else { "No".to_string() },
                 |pattern, target| target.contains(pattern),
             ),
-            gate: ColumnFilter::new(
+            gate: ColumnFilterBridge::new(
                 |flt: &Flight| flt.gate.clone().unwrap_or("N/A".to_string()),
                 |flt| flt.gate.clone().unwrap_or("N/A".to_string()),
                 |pattern, target| pattern.split(",").into_iter().any(|d| d == target),
@@ -224,12 +161,56 @@ impl Default for ColumnFilters {
         }
     }
 }
+*/
+
+
 
 impl Default for TableFilterApp {
     fn default() -> Self {
+        let flights = Rc::new(generate_random_flights(1_000));
+        
+        let table_filter = Rc::new(TableFilter::new(&flights));
+        let mut filters: Vec<Box<dyn ColumnFilter<Flight>>> = Vec::new();
+
+        // ORIG FILTER
+        {
+            struct OrigColumnFilter {
+                column_filter_state: ColumnFilterState<Flight>
+            }
+            impl ColumnFilter<Flight> for OrigColumnFilter {
+                fn id(&self) -> &'static str { "orig_filter" }
+                fn get_value(&self, t: &Flight) -> ScalarValue { ScalarValue::Str(t.orig.clone()) }
+                fn column_filter_state(&self) -> &ColumnFilterState<Flight> { &self.column_filter_state }
+            }
+
+            filters.push(Box::new(
+                OrigColumnFilter { column_filter_state: ColumnFilterState::new(&table_filter) }
+            ));
+        }
+
+        // DEST FILTER
+        {
+            struct DestColumnFilter {
+                column_filter_state: ColumnFilterState<Flight>
+            }
+            impl ColumnFilter<Flight> for DestColumnFilter {
+                fn id(&self) -> &'static str { "dest_filter" }
+                fn get_value(&self, t: &Flight) -> ScalarValue { ScalarValue::Str(t.dest.clone()) }
+                fn column_filter_state(&self) -> &ColumnFilterState<Flight> { &self.column_filter_state }
+            }
+
+            filters.push(Box::new(
+                DestColumnFilter { column_filter_state: ColumnFilterState::new(&table_filter) }
+            ));
+
+            filters.into_iter().for_each(|filter| {
+                table_filter.add_column(filter);
+            })
+        }
+
         Self {
-            flights: generate_random_flights(1_000), // TODO: explore performance concerns for larger number of records
-            column_filters: Default::default(),
+            flights, // TODO: explore performance concerns for larger number of records
+            table_filter
         }
     }
 }
@@ -242,7 +223,7 @@ impl App for TableFilterApp {
             ui.style_mut().interaction.selectable_labels = false;
 
             // check for filter reset
-            self.column_filters.check_for_reset();
+            //self.column_filters.check_for_reset();
 
             TableBuilder::new(ui)
                 .striped(true)
@@ -251,37 +232,34 @@ impl App for TableFilterApp {
                 .cell_layout(egui::Layout::left_to_right(egui::Align::Center))
                 .column(Column::auto())
                 .column(Column::auto())
+/*                .column(Column::auto())
                 .column(Column::auto())
                 .column(Column::auto())
-                .column(Column::auto())
-                .column(Column::remainder())
+                .column(Column::remainder())*/
                 .header(20.0, |mut header| {
+
+
+                    // ORIG COLUMN
+
                     let (_, orig_resp) = header.col(|ui| {
                         ui.strong("ORIG");
-                        if self.column_filters.orig.is_active() {
+                        if self.table_filter.is_active_for_id("orig_filter") {
                             ui.strong("🌰");
                         }
                     });
-                    self.column_filters.orig.bind(
-                        Id::new("orig_filter"),
-                        orig_resp,
-                        &self.flights,
-                        &self.column_filters.evaluate_array(&self.flights, Some(0))
-                    );
+                    self.table_filter.bind_for_id("orig_filter", orig_resp);
 
+
+                    // DEST COLUMN
                     let (_, dest_resp) = header.col(|ui| {
                         ui.strong("DEST");
-                        if self.column_filters.dest.is_active() {
+                        if self.table_filter.is_active_for_id("dest_filter") {
                             ui.strong("🌰");
                         }
                     });
-                    self.column_filters.dest.bind(
-                        Id::new("dest_filter"),
-                        dest_resp,
-                        &self.flights,
-                        &self.column_filters.evaluate_array(&self.flights,Some(1))
-                    );
+                    self.table_filter.bind_for_id("dest_filter", dest_resp);
 
+/*
                     let (_, dep_date_resp) = header.col(|ui| {
                         ui.strong("DEP DATE");
                         if self.column_filters.dep_date.is_active() {
@@ -332,12 +310,12 @@ impl App for TableFilterApp {
                         gate_resp,
                         &self.flights,
                         &self.column_filters.evaluate_array(&self.flights, Some(5))
-                    );
+                    );*/
                 })
                 .body(|mut body| {
                     self.flights
-                        .iter_mut()
-                        .filter(|flt| self.column_filters.evaluate(&flt))
+                        .iter()
+                        .filter(|flt| self.table_filter.evaluate(&flt))
                         .for_each(| flight| {
                         body.row(30.0, |mut row| {
                             row.col(|ui| {
@@ -346,7 +324,7 @@ impl App for TableFilterApp {
                             row.col(|ui| {
                                 ui.label(&flight.dest);
                             });
-                            row.col(|ui| {
+/*                            row.col(|ui| {
                                 ui.label(flight.dep_date.format("%m/%d/%Y").to_string());
                             });
                             row.col(|ui| {
@@ -360,7 +338,7 @@ impl App for TableFilterApp {
                                 if ui.text_edit_singleline(&mut option_proxy).changed() {
                                     flight.gate = if option_proxy.is_empty() { None } else { Some(option_proxy) };
                                 }
-                            });
+                            });*/
                         });
                     });
                 });
