@@ -27,7 +27,7 @@
             self.column_filters.borrow().iter().for_each(|cf| cf.reset());
         }
 
-        pub fn add_column(&self, cf: Box<dyn ColumnFilter<T>>) {
+        pub fn column_filter(&self, cf: Box<dyn ColumnFilter<T>>) {
             self.column_filters.borrow_mut().push(cf);
         }
 
@@ -68,6 +68,7 @@
     pub enum ScalarValue {
         Str(String),
         U32(u32),
+        I32(i32),
         Bool(bool),
     }
     impl std::fmt::Display for ScalarValue {
@@ -76,9 +77,11 @@
                 ScalarValue::Str(s) => write!(f, "{}", s),
                 ScalarValue::U32(u) => write!(f, "{}", u),
                 ScalarValue::Bool(b) => write!(f, "{}", b),
+                ScalarValue::I32(i) => write!(f, "{}", i),
             }
         }
     }
+
 
     pub trait ColumnFilter<T> {
         fn id(&self) -> &str;

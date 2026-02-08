@@ -1,18 +1,19 @@
-use std::any::Any;
-use std::collections::HashSet;
-use std::error::Error;
-use std::rc::Rc;
+use crate::data::generate_random_flights;
+use chrono::NaiveDate;
 use eframe::egui;
 use eframe::App;
-use chrono::NaiveDate;
-use egui::{Id, Sense};
-use egui_extras::{TableBuilder, Column};
+use egui::Sense;
+use egui_extras::{Column, TableBuilder};
 use itertools::Itertools;
-use crate::data::generate_random_flights;
-use crate::table_filter::{ColumnFilter, ColumnFilterState, ScalarValue, TableFilter};
+use std::any::Any;
+use std::error::Error;
+use std::rc::Rc;
+use crate::column_filters::{I32ColumnFilter, NaiveDateColumnFilter, StringColumnFilter, U32ColumnFilter};
+use crate::table_filter::{ColumnFilter, TableFilter};
 
 mod table_filter;
 mod data;
+mod column_filters;
 
 #[derive(Clone)]
 pub struct Flight {
@@ -171,36 +172,25 @@ impl Default for TableFilterApp {
         let table_filter = Rc::new(TableFilter::new(&flights));
 
         // ORIG FILTER
-        {
-            struct OrigColumnFilter {
-                column_filter_state: ColumnFilterState<Flight>
-            }
-            impl ColumnFilter<Flight> for OrigColumnFilter {
-                fn id(&self) -> &'static str { "orig_filter" }
-                fn get_value(&self, t: &Flight) -> ScalarValue { ScalarValue::Str(t.orig.clone()) }
-                fn column_filter_state(&self) -> &ColumnFilterState<Flight> { &self.column_filter_state }
-            }
-
-            table_filter.add_column(Box::new(
-                OrigColumnFilter { column_filter_state: ColumnFilterState::new(&table_filter) }
-            ));
-        }
+        table_filter.column_filter(Box::new(
+            StringColumnFilter::new("orig_filter", Rc::clone(&table_filter), Box::new(|x| x.orig.clone() ) )
+        ));
 
         // DEST FILTER
-        {
-            struct DestColumnFilter {
-                column_filter_state: ColumnFilterState<Flight>
-            }
-            impl ColumnFilter<Flight> for DestColumnFilter {
-                fn id(&self) -> &'static str { "dest_filter" }
-                fn get_value(&self, t: &Flight) -> ScalarValue { ScalarValue::Str(t.dest.clone()) }
-                fn column_filter_state(&self) -> &ColumnFilterState<Flight> { &self.column_filter_state }
-            }
+        table_filter.column_filter(Box::new(
+            StringColumnFilter::new("dest_filter", Rc::clone(&table_filter), Box::new(|x| x.dest.clone() ) )
+        ));
 
-            table_filter.add_column(Box::new(
-                DestColumnFilter { column_filter_state: ColumnFilterState::new(&table_filter) }
-            ));
-        }
+        // DEP DATE FILTER
+        table_filter.column_filter(Box::new(
+            NaiveDateColumnFilter::new("dep_date_filter", Rc::clone(&table_filter), Box::new(|x| x.dep_date ) )
+        ));
+
+        // MILEAGE FILTER
+        table_filter.column_filter(Box::new(
+            U32ColumnFilter::new("mileage_filter", Rc::clone(&table_filter), Box::new(|x| x.mileage ) )
+        ));
+
 
         Self {
             flights, // TODO: explore performance concerns for larger number of records
@@ -226,15 +216,14 @@ impl App for TableFilterApp {
                 .cell_layout(egui::Layout::left_to_right(egui::Align::Center))
                 .column(Column::auto())
                 .column(Column::auto())
-/*                .column(Column::auto())
                 .column(Column::auto())
                 .column(Column::auto())
-                .column(Column::remainder())*/
+                //.column(Column::auto())
+                //.column(Column::remainder())
                 .header(20.0, |mut header| {
 
 
                     // ORIG COLUMN
-
                     let (_, orig_resp) = header.col(|ui| {
                         ui.strong("ORIG");
                         if self.table_filter.is_active_for_id("orig_filter") {
@@ -253,33 +242,25 @@ impl App for TableFilterApp {
                     });
                     self.table_filter.bind_for_id("dest_filter", dest_resp);
 
-/*
+                    // DEP DT COLUMN
                     let (_, dep_date_resp) = header.col(|ui| {
                         ui.strong("DEP DATE");
-                        if self.column_filters.dep_date.is_active() {
+                        if self.table_filter.is_active_for_id( "dep_date_filter") {
                             ui.strong("🌰");
                         }
                     });
-                    self.column_filters.dep_date.bind(
-                        Id::new("dep_date_filter"),
-                        dep_date_resp,
-                        &self.flights,
-                        &self.column_filters.evaluate_array(&self.flights, Some(2))
-                    );
+                    self.table_filter.bind_for_id("dep_date_filter", dep_date_resp);
 
+                    // MILEAGE COLUMN
                     let (_, mileage_resp) = header.col(|ui| {
                         ui.strong("MILEAGE");
-                        if self.column_filters.mileage.is_active() {
+                        if self.table_filter.is_active_for_id("mileage_filter") {
                             ui.strong("🌰");
                         }
                     });
-                    self.column_filters.mileage.bind(
-                        Id::new("mileage_filter"),
-                        mileage_resp,
-                        &self.flights,
-                        &self.column_filters.evaluate_array(&self.flights, Some(3))
-                    );
+                    self.table_filter.bind_for_id("mileage_filter", mileage_resp);
 
+                    /*
                     let (_, cancelled_resp) = header.col(|ui| {
                         ui.strong("CANCELLED");
                         if self.column_filters.cancelled.is_active() {
@@ -304,7 +285,8 @@ impl App for TableFilterApp {
                         gate_resp,
                         &self.flights,
                         &self.column_filters.evaluate_array(&self.flights, Some(5))
-                    );*/
+                    );
+                    */
                 })
                 .body(|mut body| {
                     self.flights
@@ -318,12 +300,12 @@ impl App for TableFilterApp {
                             row.col(|ui| {
                                 ui.label(&flight.dest);
                             });
-/*                            row.col(|ui| {
+                            row.col(|ui| {
                                 ui.label(flight.dep_date.format("%m/%d/%Y").to_string());
                             });
                             row.col(|ui| {
                                 ui.label(flight.mileage.to_string());
-                            });
+                            });/*
                             row.col(|ui| {
                                 ui.checkbox(&mut flight.cancelled, "");
                             });
