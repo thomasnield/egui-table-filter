@@ -15,9 +15,8 @@ You can also create custom search functionality to parse the strings for special
 ## TODO
 
 - [X] Gray out entries that are no longer visible due to other column filter
-- [ ] Extract out common methods as traits for `ColumnFilters` implementations
-- [ ] Stress test on a larger dataset and optimize with caches
-- [ ] Find opportunities to make more idiomatic without making overly opinionated (macros might be needed :/)
-- [ ] Have pre-defined templates to streamline common data types and operations (e.g., search with int ranges, date ranges, regular expressions, comma-separated values)
+- [X] Extract out common methods as traits for `ColumnFilters` implementations
+- [X] Stress test on a larger dataset
+- [X] Find opportunities to make more idiomatic without making overly opinionated (macros might be needed :/)
+- [X] Have pre-defined templates to streamline common data types and operations (e.g., search with int ranges, date ranges, regular expressions, comma-separated values)
 - [ ] Documentation on usage
-- [ ] Explore patterns outside the table in egui-extras, as this widget is agnostic to controls it is bound to

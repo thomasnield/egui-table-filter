@@ -49,7 +49,8 @@ struct TableFilterApp {
 
 impl Default for TableFilterApp {
     fn default() -> Self {
-        let flights = Rc::new(generate_random_flights(1_000));
+        // backing data and table filter objects MUST be in a Rc.
+        let flights = Rc::new(generate_random_flights(10_000));
         let table_filter = TableFilter::new(&flights);
 
         // STRING FILTERS
@@ -91,9 +92,8 @@ impl App for TableFilterApp {
             ui.heading("Flights");
 
             ui.style_mut().interaction.selectable_labels = false;
-
-            // check for filter reset
-            //self.column_filters.check_for_reset();
+            let text_style = egui::TextStyle::Body;
+            let row_height = ui.text_style_height(&text_style) + 10.0;
 
             TableBuilder::new(ui)
                 .striped(true)
@@ -158,33 +158,39 @@ impl App for TableFilterApp {
 
                 })
                 .body(|mut body| {
-                    self.flights
-                        .iter()
+
+                    let filtered_flights = self.flights.iter()
                         .filter(|flt| self.table_filter.evaluate(&flt))
-                        .for_each(|mut flight| {
-                        body.row(30.0, |mut row| {
-                            row.col(|ui| {
-                                ui.label(&flight.orig);
-                            });
-                            row.col(|ui| {
-                                ui.label(&flight.dest);
-                            });
-                            row.col(|ui| {
-                                ui.label(flight.dep_date.format("%-m/%-d/%Y").to_string());
-                            });
-                            row.col(|ui| {
-                                ui.label(flight.mileage.to_string());
-                            });
-                            row.col(|ui| {
-                                ui.checkbox(&mut flight.cancelled.borrow_mut(), "");
-                            });
-                            row.col(|ui| {
-                                let mut option_proxy = flight.gate.borrow().clone().unwrap_or(String::default());
-                                if ui.text_edit_singleline(&mut option_proxy).changed() {
-                                    *flight.gate.borrow_mut() = if option_proxy.is_empty() { None } else { Some(option_proxy) };
-                                }
-                            });
+                        .collect::<Vec<_>>();
+
+                    let total_rows = filtered_flights.len();
+
+                    // use rows to only render the rows that are in scrolled view
+                    body.rows(row_height, total_rows, |mut row| {
+                        let flight = filtered_flights[row.index()];
+
+                        row.col(|ui| {
+                            ui.label(&flight.orig);
                         });
+                        row.col(|ui| {
+                            ui.label(&flight.dest);
+                        });
+                        row.col(|ui| {
+                            ui.label(flight.dep_date.format("%-m/%-d/%Y").to_string());
+                        });
+                        row.col(|ui| {
+                            ui.label(flight.mileage.to_string());
+                        });
+                        row.col(|ui| {
+                            ui.checkbox(&mut flight.cancelled.borrow_mut(), "");
+                        });
+                        row.col(|ui| {
+                            let mut option_proxy = flight.gate.borrow().clone().unwrap_or(String::default());
+                            if ui.text_edit_singleline(&mut option_proxy).changed() {
+                                *flight.gate.borrow_mut() = if option_proxy.is_empty() { None } else { Some(option_proxy) };
+                            }
+                        });
+
                     });
                 });
         });
