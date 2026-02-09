@@ -24,6 +24,22 @@ impl <T> ColumnFilter<T> for StringColumnFilter<T> {
     fn column_filter_state(&self) -> &ColumnFilterState<T> { &self.column_filter_state }
 }
 
+#[macro_export]
+macro_rules! string_filters {
+    // This pattern allows: string_filters!(table, ("id1", |x| ...), ("id2", |x| ...))
+    ($table:expr, $( ($id:expr, |$arg:ident| $mapper:expr) ),* $(,)?) => {
+        $(
+            $table.column_filter(Box::new(
+                $crate::StringColumnFilter::new(
+                    $id,
+                    std::rc::Rc::clone(&$table),
+                    Box::new(|$arg| $mapper)
+                )
+            ));
+        )*
+    };
+}
+
 pub struct U32ColumnFilter<T> {
     id: String,
     column_filter_state: ColumnFilterState<T>,
@@ -46,6 +62,21 @@ impl <T> ColumnFilter<T> for U32ColumnFilter<T> {
     fn column_filter_state(&self) -> &ColumnFilterState<T> { &self.column_filter_state }
 }
 
+#[macro_export]
+macro_rules! u32_filters {
+    // This pattern allows: string_filters!(table, ("id1", |x| ...), ("id2", |x| ...))
+    ($table:expr, $( ($id:expr, |$arg:ident| $mapper:expr) ),* $(,)?) => {
+        $(
+            $table.column_filter(Box::new(
+                $crate::U32ColumnFilter::new(
+                    $id,
+                    std::rc::Rc::clone(&$table),
+                    Box::new(|$arg| $mapper)
+                )
+            ));
+        )*
+    };
+}
 
 pub struct I32ColumnFilter<T> {
     id: String,
@@ -61,6 +92,22 @@ impl <T> I32ColumnFilter<T> {
             mapper
         }
     }
+}
+
+#[macro_export]
+macro_rules! i32_filters {
+    // This pattern allows: string_filters!(table, ("id1", |x| ...), ("id2", |x| ...))
+    ($table:expr, $( ($id:expr, |$arg:ident| $mapper:expr) ),* $(,)?) => {
+        $(
+            $table.column_filter(Box::new(
+                $crate::I32ColumnFilter::new(
+                    $id,
+                    std::rc::Rc::clone(&$table),
+                    Box::new(|$arg| $mapper)
+                )
+            ));
+        )*
+    };
 }
 
 impl <T> ColumnFilter<T> for I32ColumnFilter<T> {
@@ -96,3 +143,28 @@ impl <T> ColumnFilter<T> for NaiveDateColumnFilter<T> {
     }
 }
 
+#[macro_export]
+macro_rules! naive_date_filters {
+    // This pattern allows: string_filters!(table, ("id1", |x| ...), ("id2", |x| ...))
+    ($table:expr, $( ($id:expr, |$arg:ident| $mapper:expr) ),* $(,)?) => {
+        $(
+            $table.column_filter(Box::new(
+                $crate::NaiveDateColumnFilter::new(
+                    $id,
+                    std::rc::Rc::clone(&$table),
+                    Box::new(|$arg| $mapper)
+                )
+            ));
+        )*
+    };
+}
+
+#[macro_export]
+macro_rules! col_with_filter {
+    ($header:expr, $table_filter:expr, $id:expr, |$ui:ident| $body:expr) => {{
+        let (_, resp) = $header.col(|$ui| {
+            $body
+        });
+        $table_filter.bind_for_id($id, resp);
+    }};
+}

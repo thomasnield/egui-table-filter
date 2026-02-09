@@ -13,11 +13,13 @@
     }
 
     impl <T> TableFilter<T> {
-        pub fn new(backing_data: &Rc<Vec<T>>) -> Self {
-            Self {
-                backing_data: Rc::clone(backing_data),
-                column_filters: RefCell::new(vec![])
-            }
+        pub fn new(backing_data: &Rc<Vec<T>>) -> Rc<Self> {
+            Rc::new(
+                Self {
+                    backing_data: Rc::clone(backing_data),
+                    column_filters: RefCell::new(vec![])
+                }
+            )
         }
 
         pub fn evaluate(&self, item: &T) -> bool {
@@ -43,10 +45,6 @@
                     cf.bind(response);
                 });
         }
-/*        pub fn for_id(&self, id: &str) -> Option<&Box<dyn ColumnFilter<T>>> {
-            self.column_filters.borrow().iter()
-                .find(|cf| *cf.id() == *id)
-        }*/
     }
 
     pub struct ColumnFilterState<T> {

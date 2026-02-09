@@ -169,31 +169,29 @@ impl Default for ColumnFilters {
 impl Default for TableFilterApp {
     fn default() -> Self {
         let flights = Rc::new(generate_random_flights(1_000));
-        let table_filter = Rc::new(TableFilter::new(&flights));
+        let table_filter = TableFilter::new(&flights);
 
-        // ORIG FILTER
-        table_filter.column_filter(Box::new(
-            StringColumnFilter::new("orig_filter", Rc::clone(&table_filter), Box::new(|x| x.orig.clone() ) )
-        ));
+        // STRING FILTERS
+        string_filters!(
+            table_filter,
+            ("orig_filter", |x| x.orig.clone()),
+            ("dest_filter", |x| x.dest.clone()),
+        );
 
-        // DEST FILTER
-        table_filter.column_filter(Box::new(
-            StringColumnFilter::new("dest_filter", Rc::clone(&table_filter), Box::new(|x| x.dest.clone() ) )
-        ));
+        // NAIVE DATE FILTERS
+        naive_date_filters!(
+            table_filter,
+            ("dep_date_filter", |x| x.dep_date),
+        );
 
-        // DEP DATE FILTER
-        table_filter.column_filter(Box::new(
-            NaiveDateColumnFilter::new("dep_date_filter", Rc::clone(&table_filter), Box::new(|x| x.dep_date ) )
-        ));
-
-        // MILEAGE FILTER
-        table_filter.column_filter(Box::new(
-            U32ColumnFilter::new("mileage_filter", Rc::clone(&table_filter), Box::new(|x| x.mileage ) )
-        ));
-
+        // U32 FILTERS
+        u32_filters!(
+            table_filter,
+            ("mileage_filter", |x| x.mileage),
+        );
 
         Self {
-            flights, // TODO: explore performance concerns for larger number of records
+            flights,
             table_filter
         }
     }
@@ -222,43 +220,38 @@ impl App for TableFilterApp {
                 //.column(Column::remainder())
                 .header(20.0, |mut header| {
 
-
                     // ORIG COLUMN
-                    let (_, orig_resp) = header.col(|ui| {
+                    col_with_filter!(header, self.table_filter, "orig_filter", |ui| {
                         ui.strong("ORIG");
                         if self.table_filter.is_active_for_id("orig_filter") {
                             ui.strong("🌰");
                         }
                     });
-                    self.table_filter.bind_for_id("orig_filter", orig_resp);
-
 
                     // DEST COLUMN
-                    let (_, dest_resp) = header.col(|ui| {
+                    col_with_filter!(header, self.table_filter, "dest_filter", |ui| {
                         ui.strong("DEST");
                         if self.table_filter.is_active_for_id("dest_filter") {
                             ui.strong("🌰");
                         }
                     });
-                    self.table_filter.bind_for_id("dest_filter", dest_resp);
 
                     // DEP DT COLUMN
-                    let (_, dep_date_resp) = header.col(|ui| {
+                    col_with_filter!(header, self.table_filter, "dep_date_filter", |ui| {
                         ui.strong("DEP DATE");
-                        if self.table_filter.is_active_for_id( "dep_date_filter") {
+                        if self.table_filter.is_active_for_id("dep_date_filter") {
                             ui.strong("🌰");
                         }
                     });
-                    self.table_filter.bind_for_id("dep_date_filter", dep_date_resp);
 
                     // MILEAGE COLUMN
-                    let (_, mileage_resp) = header.col(|ui| {
+                    col_with_filter!(header, self.table_filter, "mileage_filter", |ui| {
                         ui.strong("MILEAGE");
                         if self.table_filter.is_active_for_id("mileage_filter") {
                             ui.strong("🌰");
                         }
                     });
-                    self.table_filter.bind_for_id("mileage_filter", mileage_resp);
+
 
                     /*
                     let (_, cancelled_resp) = header.col(|ui| {
