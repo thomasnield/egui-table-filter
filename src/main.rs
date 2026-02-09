@@ -50,7 +50,7 @@ struct TableFilterApp {
 impl Default for TableFilterApp {
     fn default() -> Self {
         // backing data and table filter objects MUST be in a Rc.
-        let flights = Rc::new(generate_random_flights(10_000));
+        let flights = Rc::new(generate_random_flights(1_000));
         let table_filter = TableFilter::new(&flights);
 
         // STRING FILTERS
