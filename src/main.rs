@@ -6,9 +6,10 @@ use egui::Sense;
 use egui_extras::{Column, TableBuilder};
 use itertools::Itertools;
 use std::any::Any;
+use std::cell::RefCell;
 use std::error::Error;
 use std::rc::Rc;
-use crate::column_filters::{I32ColumnFilter, NaiveDateColumnFilter, StringColumnFilter, U32ColumnFilter};
+use crate::column_filters::{I32ColumnFilter, NaiveDateColumnFilter, StringColumnFilter, U32ColumnFilter, BoolColumnFilter};
 use crate::table_filter::{ColumnFilter, TableFilter};
 
 mod table_filter;
@@ -22,8 +23,8 @@ pub struct Flight {
     dest: String,
     dep_date: NaiveDate,
     mileage: u32,
-    cancelled: bool,
-    gate: Option<String>,
+    cancelled: RefCell<bool>,
+    gate: RefCell<Option<String>>,
 }
 
 fn main() -> eframe::Result {
@@ -46,126 +47,6 @@ struct TableFilterApp {
     table_filter: Rc<TableFilter<Flight>>,
 }
 
-/*
-impl Default for ColumnFilters {
-    fn default() -> Self {
-        Self {
-            orig: ColumnFilterBridge::new(
-                |flt: &Flight| flt.orig.clone(),
-                |flt| flt.orig.clone(),
-                |pattern, target| target.starts_with(pattern),
-            ),
-            dest: ColumnFilterBridge::new(
-                |flt: &Flight| flt.dest.clone(),
-                |flt| flt.dest.clone(),
-                |pattern, target| target.starts_with(pattern),
-            ),
-            dep_date: ColumnFilterBridge::new(
-                |flt: &Flight| flt.dep_date.format("%m/%d/%Y").to_string(),
-                |flt| flt.dep_date.format("%m/%d/%Y").to_string(),
-                |pattern, target|  {
-
-                    return if Regex::new("[0-9]{1,2}/[0-9]{2}/[0-9]{4}><[0-9]{1,2}/[0-9]{2}/[0-9]{4}").unwrap().is_match(pattern) {
-                        let (dt_left,dt_right) = pattern.split("><").collect_tuple().unwrap();
-
-                        let dt_left = NaiveDate::parse_from_str(&dt_left, "%m/%d/%Y");
-                        let dt_right = NaiveDate::parse_from_str(&dt_right, "%m/%d/%Y");
-                        let dt = NaiveDate::parse_from_str(target, "%m/%d/%Y");
-
-                        if let Ok(dt_left) = dt_left {
-                            if let Ok(dt_right) = dt_right {
-                                if let Ok(dt) = dt {
-                                    dt_left <= dt && dt <= dt_right
-                                } else {
-                                    false
-                                }
-                            } else { false }
-                        } else { false }
-                    }
-                    else if Regex::new("<[0-9]{1,2}/[0-9]{2}/[0-9]{4}").unwrap().is_match(pattern) {
-                        let p = pattern.replace("<", "");
-
-                        if let Ok(p) = NaiveDate::parse_from_str(&p, "%m/%d/%Y") {
-                            if let Ok(s) = NaiveDate::parse_from_str(&target, "%m/%d/%Y") {
-                                s <= p
-                            } else { false }
-                        } else { false }
-                    } else if Regex::new(">[0-9]{1,2}/[0-9]{2}/[0-9]{4}").unwrap().is_match(pattern) {
-
-                        let p = pattern.replace(">", "");
-
-                        if let Ok(p) = NaiveDate::parse_from_str(&p, "%m/%d/%Y") {
-                            if let Ok(s) = NaiveDate::parse_from_str(&target, "%m/%d/%Y") {
-                                s >= p
-                            } else { false }
-                        } else { false }
-                    }
-                    else {
-                        target.starts_with(pattern)
-                    }
-                },
-            ),
-            mileage: ColumnFilterBridge::new(
-                |flt: &Flight| flt.mileage,
-                |flt| flt.mileage.to_string(),
-                |pattern, target|
-                    return if Regex::new("[0-9]+><[0-9]+").unwrap().is_match(pattern) {
-                        let (int_left, int_right) = pattern.split("><").collect_tuple().unwrap();
-
-                        let u_left = int_left.parse::<usize>();
-                        let u_right = int_right.parse::<usize>();
-                        let u = target.parse::<usize>();
-
-                        if let Ok(u_left) = u_left {
-                            if let Ok(u_right) = u_right {
-                                if let Ok(u) = u {
-                                    u_left <= u && u <= u_right
-                                } else {
-                                    false
-                                }
-                            } else { false }
-                        } else { false }
-                    }
-                    else if Regex::new("<[0-9]+").unwrap().is_match(pattern) {
-                        let p = pattern.replace("<", "");
-
-                        if let Ok(p) = p.parse::<usize>() {
-                            if let Ok(s) = target.parse::<usize>() {
-                                s <= p
-                            } else { false }
-                        } else { false }
-                    } else if Regex::new(">[0-9]+").unwrap().is_match(pattern) {
-
-                        let p = pattern.replace(">", "");
-
-                        if let Ok(p) = p.parse::<usize>() {
-                            if let Ok(s) = target.parse::<usize>() {
-                                s >= p
-                            } else { false }
-                        } else { false }
-                    }
-                    else {
-                        target.starts_with(pattern)
-                    }
-                ,
-            ),
-            cancelled: ColumnFilterBridge::new(
-                |flt: &Flight| flt.cancelled,
-                |flt| if flt.cancelled { "Yes".to_string() } else { "No".to_string() },
-                |pattern, target| target.contains(pattern),
-            ),
-            gate: ColumnFilterBridge::new(
-                |flt: &Flight| flt.gate.clone().unwrap_or("N/A".to_string()),
-                |flt| flt.gate.clone().unwrap_or("N/A".to_string()),
-                |pattern, target| pattern.split(",").into_iter().any(|d| d == target),
-            ),
-        }
-    }
-}
-*/
-
-
-
 impl Default for TableFilterApp {
     fn default() -> Self {
         let flights = Rc::new(generate_random_flights(1_000));
@@ -176,6 +57,7 @@ impl Default for TableFilterApp {
             table_filter,
             ("orig_filter", |x| x.orig.clone()),
             ("dest_filter", |x| x.dest.clone()),
+            ("gate_number_filter", |x| x.gate.borrow().clone().unwrap_or_default()),
         );
 
         // NAIVE DATE FILTERS
@@ -188,6 +70,12 @@ impl Default for TableFilterApp {
         u32_filters!(
             table_filter,
             ("mileage_filter", |x| x.mileage),
+        );
+
+        // BOOL FILTERS
+        bool_filters!(
+            table_filter,
+            ("cancelled_filter", |x| x.cancelled.borrow().clone())
         );
 
         Self {
@@ -216,8 +104,8 @@ impl App for TableFilterApp {
                 .column(Column::auto())
                 .column(Column::auto())
                 .column(Column::auto())
-                //.column(Column::auto())
-                //.column(Column::remainder())
+                .column(Column::auto())
+                .column(Column::remainder())
                 .header(20.0, |mut header| {
 
                     // ORIG COLUMN
@@ -252,40 +140,28 @@ impl App for TableFilterApp {
                         }
                     });
 
-
-                    /*
-                    let (_, cancelled_resp) = header.col(|ui| {
+                    // CANCELLED COLUMN
+                    col_with_filter!(header, self.table_filter, "cancelled_filter", |ui| {
                         ui.strong("CANCELLED");
-                        if self.column_filters.cancelled.is_active() {
+                        if self.table_filter.is_active_for_id("cancelled_filter") {
                             ui.strong("🌰");
                         }
                     });
-                    self.column_filters.cancelled.bind(
-                        Id::new("cancelled_filter"),
-                        cancelled_resp,
-                        &self.flights,
-                        &self.column_filters.evaluate_array(&self.flights, Some(4))
-                    );
 
-                    let (_, gate_resp) = header.col(|ui| {
-                        ui.strong("GATE NO.");
-                        if self.column_filters.gate.is_active() {
+                    // GATE NUMBER COLUMN
+                    col_with_filter!(header, self.table_filter, "gate_number_filter", |ui| {
+                        ui.strong("GATE NUMBER");
+                        if self.table_filter.is_active_for_id("gate_number_filter") {
                             ui.strong("🌰");
                         }
                     });
-                    self.column_filters.gate.bind(
-                        Id::new("gate_filter"),
-                        gate_resp,
-                        &self.flights,
-                        &self.column_filters.evaluate_array(&self.flights, Some(5))
-                    );
-                    */
+
                 })
                 .body(|mut body| {
                     self.flights
                         .iter()
                         .filter(|flt| self.table_filter.evaluate(&flt))
-                        .for_each(| flight| {
+                        .for_each(|mut flight| {
                         body.row(30.0, |mut row| {
                             row.col(|ui| {
                                 ui.label(&flight.orig);
@@ -294,20 +170,20 @@ impl App for TableFilterApp {
                                 ui.label(&flight.dest);
                             });
                             row.col(|ui| {
-                                ui.label(flight.dep_date.format("%m/%d/%Y").to_string());
+                                ui.label(flight.dep_date.format("%-m/%-d/%Y").to_string());
                             });
                             row.col(|ui| {
                                 ui.label(flight.mileage.to_string());
-                            });/*
-                            row.col(|ui| {
-                                ui.checkbox(&mut flight.cancelled, "");
                             });
                             row.col(|ui| {
-                                let mut option_proxy = flight.gate.clone().unwrap_or(String::default());
+                                ui.checkbox(&mut flight.cancelled.borrow_mut(), "");
+                            });
+                            row.col(|ui| {
+                                let mut option_proxy = flight.gate.borrow().clone().unwrap_or(String::default());
                                 if ui.text_edit_singleline(&mut option_proxy).changed() {
-                                    flight.gate = if option_proxy.is_empty() { None } else { Some(option_proxy) };
+                                    *flight.gate.borrow_mut() = if option_proxy.is_empty() { None } else { Some(option_proxy) };
                                 }
-                            });*/
+                            });
                         });
                     });
                 });

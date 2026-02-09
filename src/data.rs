@@ -1,3 +1,4 @@
+use std::cell::RefCell;
 use chrono::NaiveDate;
 use rand::Rng;
 use std::f64::consts::PI;
@@ -101,8 +102,8 @@ pub fn generate_random_flights(n: usize) -> Vec<Flight> {
             dest: dest_code.to_string(),
             dep_date,
             mileage,
-            cancelled,
-            gate,
+            cancelled: RefCell::new(cancelled),
+            gate: RefCell::new(gate),
         });
     }
 

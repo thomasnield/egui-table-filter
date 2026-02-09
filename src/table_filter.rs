@@ -123,7 +123,7 @@
         fn contains(&self, value: &ScalarValue) -> bool {
             !self.column_filter_state().unselected_values.borrow().contains(value)
         }
-        fn search_pattern(&self, target: &String, pattern: &String) -> bool {
+        fn search_pattern(&self, pattern: &String, target: &String) -> bool {
             target.starts_with(pattern)
         }
         fn get_string_value(&self, t: &T) -> String {
