@@ -4,7 +4,7 @@
     use std::iter::zip;
     use std::rc::Rc;
     use eframe::emath::RectAlign;
-    use egui::{ScrollArea, Id, Popup, PopupCloseBehavior, Response, TextEdit, RichText, Color32};
+    use egui::{ScrollArea, Id, Popup, PopupCloseBehavior, Response, TextEdit, RichText, Color32, Layout, Align};
     use itertools::Itertools;
 
     pub struct TableFilter<T> {
@@ -163,52 +163,58 @@
 
                         let filter_array = self.selectable_value_bool_array();
 
+                        let visible_unique: HashSet<ScalarValue> = zip(self.column_filter_state().table_filter.backing_data.iter(), filter_array)
+                            .map(|(d, b)| (self.get_value(&d),b))
+                            .filter(|(d,b)| *b)
+                            .map(|(d,b)| d)
+                            .collect();
+
+                        let search_field_empty = self.column_filter_state().search_field.borrow().is_empty();
+
+                        let listed_data = self.column_filter_state().table_filter.backing_data.iter()
+                            .filter(|d|search_field_empty ||
+                                self.search_pattern(&self.column_filter_state().search_field.borrow(), &self.get_string_value(d))
+                            )
+                            .unique_by(|d| self.get_value(d))
+                            .sorted_by_key(|d| self.get_value(d))
+                            .collect::<Vec<_>>();
+
+                        let text_style = egui::TextStyle::Body;
+                        let row_height = ui.text_style_height(&text_style);
                         // selectable values
                         ScrollArea::vertical()
                             .min_scrolled_height(300.0)
                             .max_height(300.0)
-                            .show(ui, |ui| {
+                            .show_rows(ui, row_height, listed_data.len(), |ui, row_range| {
 
-                                ui.vertical(|ui| {
+                                ui.with_layout(
+                                    Layout::top_down(Align::Min)          // left align
+                                        .with_cross_justify(true), |ui| {
 
-                                    let search_field_empty = self.column_filter_state().search_field.borrow().is_empty();
-
-                                    let visible_unique: HashSet<ScalarValue> = zip(self.column_filter_state().table_filter.backing_data.iter(), filter_array)
-                                        .map(|(d, b)| (self.get_value(&d),b))
-                                        .filter(|(d,b)| *b)
-                                        .map(|(d,b)| d)
-                                        .collect();
-
-
-                                    self.column_filter_state().table_filter.backing_data.iter()
-                                        .filter(|d|search_field_empty ||
-                                            self.search_pattern(&self.column_filter_state().search_field.borrow(), &self.get_string_value(d))
-                                        )
-                                        .unique_by(|d| self.get_value(d))
-                                        .sorted_by_key(|d| self.get_value(d))
-                                        .for_each(|d| {
-                                            let v = self.get_value(d);
-
-                                            let label = if !visible_unique.contains(&v) {
-                                                RichText::new(&self.get_string_value(d)).weak()
-                                            } else {
-                                                RichText::new(&self.get_string_value(d))
-                                            };
-
-                                            let mut checked = !self.column_filter_state().unselected_values.borrow().contains(&v) && (
-                                                self.column_filter_state().search_field.borrow().is_empty() ||
-                                                    self.search_pattern(&self.column_filter_state().search_field.borrow(), &self.get_string_value(d))
-                                            );
-
-                                            if ui.checkbox(&mut checked, label).clicked() {
-                                                if checked {
-                                                    self.column_filter_state().unselected_values.borrow_mut().remove(&v);
+                                        listed_data[row_range].iter()
+                                            .for_each(|d| {
+                                                let v = self.get_value(d);
+                                                let label = if !visible_unique.contains(&v) {
+                                                    RichText::new(&self.get_string_value(d)).weak()
                                                 } else {
-                                                    self.column_filter_state().unselected_values.borrow_mut().insert(v);
+                                                    RichText::new(&self.get_string_value(d))
+                                                };
+
+                                                let mut checked = !self.column_filter_state().unselected_values.borrow().contains(&v) && (
+                                                    self.column_filter_state().search_field.borrow().is_empty() ||
+                                                        self.search_pattern(&self.column_filter_state().search_field.borrow(), &self.get_string_value(d))
+                                                );
+
+                                                if ui.checkbox(&mut checked, label).clicked() {
+                                                    if checked {
+                                                        self.column_filter_state().unselected_values.borrow_mut().remove(&v);
+                                                    } else {
+                                                        self.column_filter_state().unselected_values.borrow_mut().insert(v);
+                                                    }
                                                 }
-                                            }
-                                        });
-                                });
+                                            });
+                                    }
+                                );
                             });
                         ui.add_space(20.0);
 
