@@ -79,7 +79,7 @@ pub fn generate_random_flights(n: usize) -> Vec<Flight> {
 
         let month = rng.gen_range(1..=12);
         let day = rng.gen_range(1..=28);
-        let dep_date = NaiveDate::from_ymd_opt(2015, month, day).unwrap();
+        let dep_date = NaiveDate::from_ymd_opt(2026, month, day).unwrap();
 
         let cancelled = rng.gen_bool(0.05);
 
