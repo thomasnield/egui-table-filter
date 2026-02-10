@@ -64,7 +64,7 @@ impl Default for TableFilterApp {
         // NAIVE DATE FILTERS
         naive_date_filters!(
             table_filter,
-            ("dep_date_filter", |x| x.dep_date),
+            ("dep_date_filter", |x| x.dep_date, "%m/%d/%Y"),
         );
 
         // U32 FILTERS
