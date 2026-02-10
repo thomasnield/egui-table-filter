@@ -1,3 +1,6 @@
+use std::cell::{LazyCell, OnceCell};
+use std::iter::once_with;
+use std::num::ParseIntError;
 use std::rc::Rc;
 use chrono::NaiveDate;
 use itertools::Itertools;
@@ -56,12 +59,55 @@ impl <T> U32ColumnFilter<T> {
             mapper
         }
     }
+    const LESS_THAN_REGEX: LazyCell<Regex> = LazyCell::new(|| Regex::new(r#"^<[0-9]+$"#).unwrap());
+    const LESS_THAN_EQUAL_REGEX: LazyCell<Regex> = LazyCell::new(|| Regex::new(r#"^<=[0-9]+$"#).unwrap());
+    const GREATER_THAN_REGEX: LazyCell<Regex> = LazyCell::new(|| Regex::new(r#"^>[0-9]+$"#).unwrap());
+    const GREATER_THAN_EQUAL_REGEX: LazyCell<Regex> = LazyCell::new(|| Regex::new(r#"^>=[0-9]+$"#).unwrap());
 }
 
 impl <T> ColumnFilter<T> for U32ColumnFilter<T> {
     fn id(&self) -> &str { self.id.as_str() }
     fn get_value(&self, t: &T) -> ScalarValue { ScalarValue::U32((self.mapper)(t)) }
     fn column_filter_state(&self) -> &ColumnFilterState<T> { &self.column_filter_state }
+    fn search_pattern(&self, pattern: &String, target: &String) -> bool {
+        pattern.split(",").into_iter().all(|pattern| {
+            if pattern.contains("<=") && Self::LESS_THAN_EQUAL_REGEX.is_match(pattern) {
+                let x: Result<u32, _> = target.parse();
+                let y: Result<u32, _> = pattern.replace("<=", "").parse();
+                if let Ok(x) = x && let Ok(y) = y {
+                    x <= y
+                } else {
+                    false
+                }
+            } else if pattern.contains(">=") && Self::GREATER_THAN_EQUAL_REGEX.is_match(pattern) {
+                let x: Result<u32, _> = target.parse();
+                let y: Result<u32, _> = pattern.replace(">=", "").parse();
+                if let Ok(x) = x && let Ok(y) = y {
+                    x >= y
+                } else {
+                    false
+                }
+            } else if pattern.contains("<") && Self::LESS_THAN_REGEX.is_match(pattern) {
+                let x: Result<u32, _> = target.parse();
+                let y: Result<u32, _> = pattern.replace("<", "").parse();
+                if let Ok(x) = x && let Ok(y) = y {
+                    x < y
+                } else {
+                    false
+                }
+            } else if pattern.contains(">") && Self::GREATER_THAN_REGEX.is_match(pattern) {
+                let x: Result<u32, _> = target.parse();
+                let y: Result<u32, _> = pattern.replace(">", "").parse();
+                if let Ok(x) = x && let Ok(y) = y {
+                    x > y
+                } else {
+                    false
+                }
+            } else {
+                target.starts_with(pattern)
+            }
+        })
+    }
 }
 
 #[macro_export]
@@ -94,6 +140,10 @@ impl <T> I32ColumnFilter<T> {
             mapper
         }
     }
+    const LESS_THAN_REGEX: LazyCell<Regex> = LazyCell::new(|| Regex::new(r#"^<[0-9]+$"#).unwrap());
+    const LESS_THAN_EQUAL_REGEX: LazyCell<Regex> = LazyCell::new(|| Regex::new(r#"^<=[0-9]+$"#).unwrap());
+    const GREATER_THAN_REGEX: LazyCell<Regex> = LazyCell::new(|| Regex::new(r#"^>[0-9]+$"#).unwrap());
+    const GREATER_THAN_EQUAL_REGEX: LazyCell<Regex> = LazyCell::new(|| Regex::new(r#"^>=[0-9]+$"#).unwrap());
 }
 
 #[macro_export]
@@ -116,6 +166,46 @@ impl <T> ColumnFilter<T> for I32ColumnFilter<T> {
     fn id(&self) -> &str { self.id.as_str() }
     fn get_value(&self, t: &T) -> ScalarValue { ScalarValue::I32((self.mapper)(t)) }
     fn column_filter_state(&self) -> &ColumnFilterState<T> { &self.column_filter_state }
+
+    fn search_pattern(&self, pattern: &String, target: &String) -> bool {
+        pattern.split(",").into_iter().all(|pattern| {
+            if pattern.contains("<=") && Self::LESS_THAN_EQUAL_REGEX.is_match(pattern) {
+                let x: Result<u32, _> = target.parse();
+                let y: Result<u32, _> = pattern.replace("<=", "").parse();
+                if let Ok(x) = x && let Ok(y) = y {
+                    x <= y
+                } else {
+                    false
+                }
+            } else if pattern.contains(">=") && Self::GREATER_THAN_EQUAL_REGEX.is_match(pattern) {
+                let x: Result<u32, _> = target.parse();
+                let y: Result<u32, _> = pattern.replace(">=", "").parse();
+                if let Ok(x) = x && let Ok(y) = y {
+                    x >= y
+                } else {
+                    false
+                }
+            } else if pattern.contains("<") && Self::LESS_THAN_REGEX.is_match(pattern) {
+                let x: Result<u32, _> = target.parse();
+                let y: Result<u32, _> = pattern.replace("<", "").parse();
+                if let Ok(x) = x && let Ok(y) = y {
+                    x < y
+                } else {
+                    false
+                }
+            } else if pattern.contains(">") && Self::GREATER_THAN_REGEX.is_match(pattern) {
+                let x: Result<u32, _> = target.parse();
+                let y: Result<u32, _> = pattern.replace(">", "").parse();
+                if let Ok(x) = x && let Ok(y) = y {
+                    x > y
+                } else {
+                    false
+                }
+            } else {
+                target.starts_with(pattern)
+            }
+        })
+    }
 }
 
 

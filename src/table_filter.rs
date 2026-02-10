@@ -233,6 +233,8 @@
                                                 self.column_filter_state().unselected_values.borrow_mut().insert(v);
                                             }
                                         });
+
+                                    self.column_filter_state().search_field.borrow_mut().clear();
                                 }
                                 ui.close();
                             }
