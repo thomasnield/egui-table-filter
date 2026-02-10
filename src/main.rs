@@ -70,13 +70,16 @@ impl Default for TableFilterApp {
         // U32 FILTERS
         u32_filters!(
             table_filter,
-            ("mileage_filter", |x| x.mileage),
+            ("mileage_filter", |x| x.mileage, |x| x.mileage.to_string()),
         );
 
         // BOOL FILTERS
         bool_filters!(
             table_filter,
-            ("cancelled_filter", |x| x.cancelled.borrow().clone())
+            ("cancelled_filter",
+                |x| x.cancelled.borrow().clone(),
+                |x| (if *x.cancelled.borrow() { "Y" } else { "N" }).to_string() // override string
+            ),
         );
 
         Self {

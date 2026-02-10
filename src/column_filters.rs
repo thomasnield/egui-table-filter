@@ -52,15 +52,17 @@ macro_rules! string_filters {
 pub struct U32ColumnFilter<T> {
     id: String,
     column_filter_state: ColumnFilterState<T>,
-    mapper: Box<dyn Fn(&T) -> u32>
+    mapper: Box<dyn Fn(&T) -> u32>,
+    str_mapper: Box<dyn Fn(&T) -> String>
 }
 
 impl <T> U32ColumnFilter<T> {
-    pub fn new(id: &str, table_filter: Rc<TableFilter<T>>, mapper: Box<dyn Fn(&T) -> u32>) -> Self {
+    pub fn new(id: &str, table_filter: Rc<TableFilter<T>>, mapper: Box<dyn Fn(&T) -> u32>, str_mapper: Box<dyn Fn(&T) -> String>) -> Self {
         Self {
             id: id.to_string(),
             column_filter_state: ColumnFilterState::new(&table_filter),
-            mapper
+            mapper,
+            str_mapper
         }
     }
     const LESS_THAN_REGEX: LazyCell<Regex> = LazyCell::new(|| Regex::new(r#"^<[0-9]+$"#).unwrap());
@@ -72,6 +74,7 @@ impl <T> U32ColumnFilter<T> {
 impl <T> ColumnFilter<T> for U32ColumnFilter<T> {
     fn id(&self) -> &str { self.id.as_str() }
     fn get_value(&self, t: &T) -> ScalarValue { ScalarValue::U32((self.mapper)(t)) }
+    fn get_string_value(&self, t: &T) -> String { (self.str_mapper)(t) }
     fn column_filter_state(&self) -> &ColumnFilterState<T> { &self.column_filter_state }
     fn search_pattern(&self, pattern: &String, target: &String) -> bool {
         pattern.split(",").into_iter().all(|pattern| {
@@ -123,7 +126,21 @@ macro_rules! u32_filters {
                 $crate::U32ColumnFilter::new(
                     $id,
                     std::rc::Rc::clone(&$table),
-                    Box::new(|$arg| $mapper)
+                    Box::new(|$arg| $mapper),
+                    Box::new(|$arg| $mapper.to_string())
+                )
+            ));
+        )*
+    };
+
+    ($table:expr, $( ($id:expr, |$arg:ident| $mapper:expr, |$str_arg:ident| $str_mapper:expr) ),* $(,)?) => {
+        $(
+            $table.column_filter(Box::new(
+                $crate::U32ColumnFilter::new(
+                    $id,
+                    std::rc::Rc::clone(&$table),
+                    Box::new(|$arg| $mapper),
+                    Box::new(|$str_arg| $str_mapper)
                 )
             ));
         )*
@@ -133,15 +150,17 @@ macro_rules! u32_filters {
 pub struct I32ColumnFilter<T> {
     id: String,
     column_filter_state: ColumnFilterState<T>,
-    mapper: Box<dyn Fn(&T) -> i32>
+    mapper: Box<dyn Fn(&T) -> i32>,
+    str_mapper: Box<dyn Fn(&T) -> String>,
 }
 
 impl <T> I32ColumnFilter<T> {
-    pub fn new(id: &str, table_filter: Rc<TableFilter<T>>, mapper: Box<dyn Fn(&T) -> i32>) -> Self {
+    pub fn new(id: &str, table_filter: Rc<TableFilter<T>>, mapper: Box<dyn Fn(&T) -> i32>, str_mapper: Box<dyn Fn(&T) -> String>) -> Self {
         Self {
             id: id.to_string(),
             column_filter_state: ColumnFilterState::new(&table_filter),
-            mapper
+            mapper,
+            str_mapper
         }
     }
     const LESS_THAN_REGEX: LazyCell<Regex> = LazyCell::new(|| Regex::new(r#"^<[0-9]+$"#).unwrap());
@@ -159,7 +178,19 @@ macro_rules! i32_filters {
                 $crate::I32ColumnFilter::new(
                     $id,
                     std::rc::Rc::clone(&$table),
-                    Box::new(|$arg| $mapper)
+                    Box::new(|$arg| $mapper.to_string())
+                )
+            ));
+        )*
+    };
+    ($table:expr, $( ($id:expr, |$arg:ident| $mapper:expr, |$str_arg:ident| $str_mapper:expr) ),* $(,)?) => {
+        $(
+            $table.column_filter(Box::new(
+                $crate::I32ColumnFilter::new(
+                    $id,
+                    std::rc::Rc::clone(&$table),
+                    Box::new(|$arg| $mapper),
+                    Box::new(|$str_arg| $str_mapper)
                 )
             ));
         )*
@@ -169,6 +200,7 @@ macro_rules! i32_filters {
 impl <T> ColumnFilter<T> for I32ColumnFilter<T> {
     fn id(&self) -> &str { self.id.as_str() }
     fn get_value(&self, t: &T) -> ScalarValue { ScalarValue::I32((self.mapper)(t)) }
+    fn get_string_value(&self, t: &T) -> String { (self.str_mapper)(t) }
     fn column_filter_state(&self) -> &ColumnFilterState<T> { &self.column_filter_state }
 
     fn search_pattern(&self, pattern: &String, target: &String) -> bool {
@@ -216,15 +248,17 @@ impl <T> ColumnFilter<T> for I32ColumnFilter<T> {
 pub struct NaiveDateColumnFilter<T> {
     id: String,
     column_filter_state: ColumnFilterState<T>,
-    mapper: Box<dyn Fn(&T) -> NaiveDate>
+    mapper: Box<dyn Fn(&T) -> NaiveDate>,
+    str_mapper: Box<dyn Fn(&T) -> String>,
 }
 
 impl <T> NaiveDateColumnFilter<T> {
-    pub fn new(id: &str, table_filter: Rc<TableFilter<T>>, mapper: Box<dyn Fn(&T) -> NaiveDate>) -> Self {
+    pub fn new(id: &str, table_filter: Rc<TableFilter<T>>, mapper: Box<dyn Fn(&T) -> NaiveDate>, str_mapper: Box<dyn Fn(&T) -> String>) -> Self {
         Self {
             id: id.to_string(),
             column_filter_state: ColumnFilterState::new(&table_filter),
             mapper,
+            str_mapper
         }
     }
 
@@ -237,11 +271,8 @@ impl <T> NaiveDateColumnFilter<T> {
 impl <T> ColumnFilter<T> for NaiveDateColumnFilter<T> {
     fn id(&self) -> &str { self.id.as_str() }
     fn get_value(&self, t: &T) -> ScalarValue { ScalarValue::I32((self.mapper)(t).to_epoch_days()) }
+    fn get_string_value(&self, t: &T) -> String { (self.str_mapper)(t) }
     fn column_filter_state(&self) -> &ColumnFilterState<T> { &self.column_filter_state }
-
-    fn get_string_value(&self, t: &T) -> String {
-        (self.mapper)(t).format("%-m/%-d/%Y").to_string()
-    }
 
     fn search_pattern(&self, pattern: &String, target: &String) -> bool {
         pattern.split(",").into_iter().all(|pattern| {
@@ -282,44 +313,6 @@ impl <T> ColumnFilter<T> for NaiveDateColumnFilter<T> {
             }
         })
     }
-
-}
-
-pub struct BoolColumnFilter<T> {
-    id: String,
-    column_filter_state: ColumnFilterState<T>,
-    mapper: Box<dyn Fn(&T) -> bool>
-}
-
-impl <T> BoolColumnFilter<T> {
-    pub fn new(id: &str, table_filter: Rc<TableFilter<T>>, mapper: Box<dyn Fn(&T) -> bool>) -> Self {
-        Self {
-            id: id.to_string(),
-            column_filter_state: ColumnFilterState::new(&table_filter),
-            mapper
-        }
-    }
-}
-
-impl <T> ColumnFilter<T> for BoolColumnFilter<T> {
-    fn id(&self) -> &str { self.id.as_str() }
-    fn get_value(&self, t: &T) -> ScalarValue { ScalarValue::Bool((self.mapper)(t)) }
-    fn column_filter_state(&self) -> &ColumnFilterState<T> { &self.column_filter_state }
-}
-
-#[macro_export]
-macro_rules! bool_filters {
-    ($table:expr, $( ($id:expr, |$arg:ident| $mapper:expr) ),* $(,)?) => {
-        $(
-            $table.column_filter(Box::new(
-                $crate::BoolColumnFilter::new(
-                    $id,
-                    std::rc::Rc::clone(&$table),
-                    Box::new(|$arg| $mapper)
-                )
-            ));
-        )*
-    };
 }
 
 #[macro_export]
@@ -331,12 +324,79 @@ macro_rules! naive_date_filters {
                 $crate::NaiveDateColumnFilter::new(
                     $id,
                     std::rc::Rc::clone(&$table),
-                    Box::new(|$arg| $mapper)
+                    Box::new(|$arg| $mapper),
+                    Box::new(|$arg| $mapper.format("%-m/%-d/%Y").to_string())
+                )
+            ));
+        )*
+    };
+    ($table:expr, $( ($id:expr, |$arg:ident| $mapper:expr, |$str_arg:ident| $str_mapper:expr) ),* $(,)?) => {
+        $(
+            $table.column_filter(Box::new(
+                $crate::NaiveDateColumnFilter::new(
+                    $id,
+                    std::rc::Rc::clone(&$table),
+                    Box::new(|$arg| $mapper),
+                    Box::new(|$str_arg| $str_mapper)
                 )
             ));
         )*
     };
 }
+
+pub struct BoolColumnFilter<T> {
+    id: String,
+    column_filter_state: ColumnFilterState<T>,
+    mapper: Box<dyn Fn(&T) -> bool>,
+    str_mapper: Box<dyn Fn(&T) -> String>,
+}
+
+impl <T> BoolColumnFilter<T> {
+    pub fn new(id: &str, table_filter: Rc<TableFilter<T>>, mapper: Box<dyn Fn(&T) -> bool>, str_mapper: Box<dyn Fn(&T) -> String>) -> Self {
+        Self {
+            id: id.to_string(),
+            column_filter_state: ColumnFilterState::new(&table_filter),
+            mapper,
+            str_mapper
+        }
+    }
+}
+
+impl <T> ColumnFilter<T> for BoolColumnFilter<T> {
+    fn id(&self) -> &str { self.id.as_str() }
+    fn get_value(&self, t: &T) -> ScalarValue { ScalarValue::Bool((self.mapper)(t)) }
+    fn get_string_value(&self, t: &T) -> String { (self.str_mapper)(t) }
+    fn column_filter_state(&self) -> &ColumnFilterState<T> { &self.column_filter_state }
+}
+
+#[macro_export]
+macro_rules! bool_filters {
+    ($table:expr, $( ($id:expr, |$arg:ident| $mapper:expr) ),* $(,)?) => {
+        $(
+            $table.column_filter(Box::new(
+                $crate::BoolColumnFilter::new(
+                    $id,
+                    std::rc::Rc::clone(&$table),
+                    Box::new(|$arg| $mapper),
+                    Box::new(|$arg| $mapper.to_string())
+                )
+            ));
+        )*
+    };
+    ($table:expr, $( ($id:expr, |$arg:ident| $mapper:expr, |$str_arg:ident| $str_mapper:expr) ),* $(,)?) => {
+        $(
+            $table.column_filter(Box::new(
+                $crate::BoolColumnFilter::new(
+                    $id,
+                    std::rc::Rc::clone(&$table),
+                    Box::new(|$arg| $mapper),
+                    Box::new(|$str_arg| $str_mapper)
+                )
+            ));
+        )*
+    };
+}
+
 
 #[macro_export]
 macro_rules! col_with_filter {
