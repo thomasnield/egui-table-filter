@@ -1,10 +1,10 @@
-    use std::cell::RefCell;
+    use std::cell::{Cell, RefCell};
     use std::collections::{HashSet};
     use std::hash::Hash;
     use std::iter::zip;
     use std::rc::Rc;
     use eframe::emath::RectAlign;
-    use egui::{ScrollArea, Id, Popup, PopupCloseBehavior, Response, TextEdit, RichText, Color32, Layout, Align};
+    use egui::{ScrollArea, Id, Popup, PopupCloseBehavior, Response, TextEdit, RichText, Color32, Layout, Align, Key};
     use itertools::Itertools;
 
     pub struct TableFilter<T> {
@@ -50,7 +50,8 @@
     pub struct ColumnFilterState<T> {
         table_filter: Rc<TableFilter<T>>,
         unselected_values: RefCell<HashSet<ScalarValue>>,
-        search_field: RefCell<String>
+        search_field: RefCell<String>,
+        apply_requested: Cell<bool>
     }
     impl <T> ColumnFilterState<T> {
         pub fn new(table_filter: &Rc<TableFilter<T>>) -> Self {
@@ -58,6 +59,7 @@
                 table_filter: Rc::clone(table_filter),
                 unselected_values: RefCell::new(Default::default()),
                 search_field: RefCell::new("".to_string()),
+                apply_requested: Cell::new(false),
             }
         }
     }
@@ -157,9 +159,9 @@
                             ui.add(search_input);
                         }
 
-/*                        if ui.input(|input| input.key_pressed(Key::Enter)) {
-                            *self.apply_button_clicked() = true;
-                        }*/
+                        if ui.input(|input| input.key_pressed(Key::Enter)) {
+                            self.column_filter_state().apply_requested.set(true);
+                        }
 
                         let filter_array = self.selectable_value_bool_array();
 
@@ -220,6 +222,9 @@
 
                         ui.horizontal(|ui| {
                             if ui.button("APPLY").clicked() {
+                                self.column_filter_state().apply_requested.set(true);
+                            }
+                            if self.column_filter_state().apply_requested.get() {
                                 if !self.column_filter_state().search_field.borrow().is_empty() {
                                     self.column_filter_state().table_filter.backing_data.iter()
                                         .unique_by(|d| self.get_value(d))
@@ -236,6 +241,7 @@
 
                                     self.column_filter_state().search_field.borrow_mut().clear();
                                 }
+                                self.column_filter_state().apply_requested.set(false);
                                 ui.close();
                             }
 
