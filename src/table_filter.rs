@@ -67,6 +67,8 @@
     #[derive(PartialEq, Eq, Hash, PartialOrd, Ord)]
     pub enum ScalarValue {
         Str(String),
+        U8(u8),
+        I8(i8),
         U32(u32),
         I32(i32),
         Bool(bool),
@@ -78,6 +80,8 @@
                 ScalarValue::U32(u) => write!(f, "{}", u),
                 ScalarValue::Bool(b) => write!(f, "{}", b),
                 ScalarValue::I32(i) => write!(f, "{}", i),
+                ScalarValue::U8(u) => write!(f, "{}", u),
+                ScalarValue::I8(i) => write!(f, "{}", i),
             }
         }
     }
