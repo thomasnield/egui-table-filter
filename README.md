@@ -19,6 +19,7 @@ You can also create custom search functionality to parse the strings for special
 In your application state, set up your filters for specific columns you want. The backing list must be an `Rc<Vec<T>>` so there is no contention of ownership, and the `TableFilter` will be in an `Rc` as well. 
 
 ```rust 
+
 struct TableFilterApp {
     flights: Rc<Vec<Flight>>,
     table_filter: Rc<TableFilter<Flight>>,
@@ -27,8 +28,8 @@ struct TableFilterApp {
 impl Default for TableFilterApp {
     fn default() -> Self {
         // backing data and table filter objects MUST be in a Rc.
-        let flights = Rc::new(generate_random_flights(10_000));
-        let table_filter = TableFilter::new(&flights); // <- returns an Rc<TableFilter>
+        let flights = Rc::new(generate_random_flights(1_000));
+        let table_filter = TableFilter::new(&flights);
 
         // STRING FILTERS
         string_filters!(
@@ -41,19 +42,22 @@ impl Default for TableFilterApp {
         // NAIVE DATE FILTERS
         naive_date_filters!(
             table_filter,
-            ("dep_date_filter", |x| x.dep_date),
+            ("dep_date_filter", |x| x.dep_date, "%m/%d/%Y"),
         );
 
         // U32 FILTERS
         u32_filters!(
             table_filter,
-            ("mileage_filter", |x| x.mileage),
+            ("mileage_filter", |x| x.mileage, |x| x.mileage.to_string()),
         );
 
         // BOOL FILTERS
         bool_filters!(
             table_filter,
-            ("cancelled_filter", |x| x.cancelled.borrow().clone())
+            ("cancelled_filter",
+                |x| x.cancelled.borrow().clone(),
+                |x| (if *x.cancelled.borrow() { "Y" } else { "N" }).to_string() // override string
+            ),
         );
 
         Self {
@@ -67,6 +71,7 @@ impl Default for TableFilterApp {
 And on the Table declaration, use the binding macros on the column headers. 
 
 ```rust 
+
 impl App for TableFilterApp {
     fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
         egui::CentralPanel::default().show(ctx, |ui| {
