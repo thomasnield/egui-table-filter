@@ -1,6 +1,4 @@
-use std::cell::{LazyCell, OnceCell};
-use std::iter::once_with;
-use std::num::ParseIntError;
+use std::cell::{LazyCell};
 use std::rc::Rc;
 use chrono::NaiveDate;
 use itertools::Itertools;
@@ -223,6 +221,11 @@ impl <T> NaiveDateColumnFilter<T> {
             mapper,
         }
     }
+
+    const LESS_THAN_REGEX: LazyCell<Regex> = LazyCell::new(|| Regex::new(r#"^<[0-9]{1,2}/[0-9]{1,2}/[0-9]{4}$"#).unwrap());
+    const LESS_THAN_EQUAL_REGEX: LazyCell<Regex> = LazyCell::new(|| Regex::new(r#"^<=[0-9]{1,2}/[0-9]{1,2}/[0-9]{4}$"#).unwrap());
+    const GREATER_THAN_REGEX: LazyCell<Regex> = LazyCell::new(|| Regex::new(r#"^>[0-9]{1,2}/[0-9]{1,2}/[0-9]{4}$"#).unwrap());
+    const GREATER_THAN_EQUAL_REGEX: LazyCell<Regex> = LazyCell::new(|| Regex::new(r#"^>=[0-9]{1,2}/[0-9]{1,2}/[0-9]{4}$"#).unwrap());
 }
 
 impl <T> ColumnFilter<T> for NaiveDateColumnFilter<T> {
@@ -233,6 +236,47 @@ impl <T> ColumnFilter<T> for NaiveDateColumnFilter<T> {
     fn get_string_value(&self, t: &T) -> String {
         (self.mapper)(t).format("%-m/%-d/%Y").to_string()
     }
+
+    fn search_pattern(&self, pattern: &String, target: &String) -> bool {
+        pattern.split(",").into_iter().all(|pattern| {
+            if pattern.contains("<=") && Self::LESS_THAN_EQUAL_REGEX.is_match(pattern) {
+                let x: Result<NaiveDate, _> =NaiveDate::parse_from_str(&target, "%m/%d/%Y");
+                let y: Result<NaiveDate, _> = NaiveDate::parse_from_str(pattern.replace("<=", "").as_str(), "%m/%d/%Y");
+                if let Ok(x) = x && let Ok(y) = y {
+                    x <= y
+                } else {
+                    false
+                }
+            } else if pattern.contains(">=") && Self::GREATER_THAN_EQUAL_REGEX.is_match(pattern) {
+                let x: Result<NaiveDate, _> = NaiveDate::parse_from_str(&target, "%m/%d/%Y");
+                let y: Result<NaiveDate, _> = NaiveDate::parse_from_str(pattern.replace(">=", "").as_str(), "%m/%d/%Y");
+                if let Ok(x) = x && let Ok(y) = y {
+                    x >= y
+                } else {
+                    false
+                }
+            } else if pattern.contains("<") && Self::LESS_THAN_REGEX.is_match(pattern) {
+                let x: Result<NaiveDate, _> = NaiveDate::parse_from_str(&target, "%m/%d/%Y");
+                let y: Result<NaiveDate, _> = NaiveDate::parse_from_str(pattern.replace("<", "").as_str(), "%m/%d/%Y");
+                if let Ok(x) = x && let Ok(y) = y {
+                    x < y
+                } else {
+                    false
+                }
+            } else if pattern.contains(">") && Self::GREATER_THAN_REGEX.is_match(pattern) {
+                let x: Result<NaiveDate, _> = NaiveDate::parse_from_str(&target, "%m/%d/%Y");
+                let y: Result<NaiveDate, _> = NaiveDate::parse_from_str(pattern.replace(">", "").as_str(), "%m/%d/%Y");
+                if let Ok(x) = x && let Ok(y) = y {
+                    x > y
+                } else {
+                    false
+                }
+            } else {
+                target.starts_with(pattern)
+            }
+        })
+    }
+
 }
 
 pub struct BoolColumnFilter<T> {
