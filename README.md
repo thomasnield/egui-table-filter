@@ -188,5 +188,5 @@ The structs and traits make this highly extensible. I will document how to do th
 - [X] Stress test on a larger dataset
 - [X] Find opportunities to make more idiomatic without making overly opinionated (macros might be needed :/)
 - [X] Have pre-defined templates to streamline common data types and operations (e.g., search with int ranges, date ranges, regular expressions, comma-separated values)
-- [ ] Expand custom searchbox logic examples
+- [X] Expand custom searchbox logic examples
 - [ ] Documentation on usage

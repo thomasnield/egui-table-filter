@@ -25,6 +25,12 @@ impl <T> ColumnFilter<T> for StringColumnFilter<T> {
     fn id(&self) -> &str { self.id.as_str() }
     fn get_value(&self, t: &T) -> ScalarValue { ScalarValue::Str((self.mapper)(t)) }
     fn column_filter_state(&self) -> &ColumnFilterState<T> { &self.column_filter_state }
+    fn search_pattern(&self, pattern: &String, target: &String) -> bool {
+        // search for multiple values separated by commas
+        pattern.split(",").any(|pattern| {
+            target.starts_with(pattern)
+        })
+    }
 }
 
 #[macro_export]
