@@ -1,4 +1,4 @@
-This is my successful port of a table filter control in Rust for the egui library, although it probably could use some API cleanup for consumer usage. 
+This is my successful port of a table filter control in Rust for the egui library. It's approaching something that I'd be happy to publish as a crate. 
 
 I first made this for [JavaFX almost 10 years ago](http://fxexperience.com/2016/03/introducing-the-controlsfx-tablefilter/). 
 
@@ -11,6 +11,8 @@ I would like to make this into a library, so I welcome any contributions to make
 You can also create custom search functionality to parse the strings for special syntax, like regular expressions or date ranges. 
 
 <img width="586" height="593" alt="image" src="https://github.com/user-attachments/assets/3e6a93cc-b93d-4841-97f5-41d20eb31ed4" />
+
+[VIDEO DEMO](https://www.youtube.com/watch?v=dbkbqy4TxCY) 
 
 ## Usage 
 
@@ -186,4 +188,5 @@ The structs and traits make this highly extensible. I will document how to do th
 - [X] Stress test on a larger dataset
 - [X] Find opportunities to make more idiomatic without making overly opinionated (macros might be needed :/)
 - [X] Have pre-defined templates to streamline common data types and operations (e.g., search with int ranges, date ranges, regular expressions, comma-separated values)
+- [ ] Expand custom searchbox logic examples
 - [ ] Documentation on usage
