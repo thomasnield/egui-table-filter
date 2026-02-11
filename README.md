@@ -195,4 +195,6 @@ The structs and traits make this highly extensible. I will document how to do th
 - [X] Have pre-defined templates to streamline common data types and operations (e.g., search with int ranges, date ranges, regular expressions, comma-separated values)
 - [X] Expand custom searchbox logic examples
 - [X] Stress test 100K records
-- [ ] Documentation on usage
+- [ ] Add `search_pattern` as parameter to macro declarations
+- [ ] Explore builder implementations as alternative to macros
+- [ ] Documentation on usage, custom `ColumnFilter` implementations 
