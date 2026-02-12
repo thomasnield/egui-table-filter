@@ -12,7 +12,7 @@ You can also create custom search functionality to parse the strings for special
 
 <img width="586" height="593" alt="image" src="https://github.com/user-attachments/assets/3e6a93cc-b93d-4841-97f5-41d20eb31ed4" />
 
-[VIDEO DEMO](https://www.youtube.com/watch?v=dbkbqy4TxCY) 
+[VIDEO DEMO](https://youtu.be/u9j5e-j3uHQ)
 
 ## Usage 
 
