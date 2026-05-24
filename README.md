@@ -22,13 +22,13 @@ In your application state, set up your filters for specific columns you want. Th
 
 struct TableFilterApp {
     flights: Rc<Vec<Flight>>,
-    table_filter: Rc<TableFilter<Flight>>,
+    table_filter: Rc<RefCell<TableFilter<Flight>>>,
 }
 
 impl Default for TableFilterApp {
     fn default() -> Self {
         // backing data and table filter objects MUST be in a Rc.
-        let flights = Rc::new(generate_random_flights(1_000));
+        let flights = Rc::new(RefCell::new(generate_random_flights(1_000)));
         let table_filter = TableFilter::new(&flights);
 
         // STRING FILTERS
@@ -145,7 +145,7 @@ impl App for TableFilterApp {
                 })
                 .body(|mut body| {
 
-                    let filtered_flights = self.flights.iter()
+                    let filtered_flights = self.flights.borrow().iter()
                         .filter(|flt| self.table_filter.evaluate(&flt))
                         .collect::<Vec<_>>();
 
@@ -153,8 +153,7 @@ impl App for TableFilterApp {
 
                     // use rows to only render the rows that are in scrolled view
                     body.rows(row_height, total_rows, |mut row| {
-                        let flight = filtered_flights[row.index()];
-
+r
                         row.col(|ui| {
                             ui.label(&flight.orig);
                         });

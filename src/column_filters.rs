@@ -1,7 +1,6 @@
 use std::cell::{LazyCell};
 use std::rc::Rc;
 use chrono::NaiveDate;
-use itertools::Itertools;
 use regex::Regex;
 use crate::table_filter::{ColumnFilter, ColumnFilterState, ScalarValue, TableFilter};
 
@@ -27,9 +26,14 @@ impl <T> ColumnFilter<T> for StringColumnFilter<T> {
     fn column_filter_state(&self) -> &ColumnFilterState<T> { &self.column_filter_state }
     fn search_pattern(&self, pattern: &String, target: &String) -> bool {
         // search for multiple values separated by commas
-        pattern.split(",").any(|pattern| {
-            target.starts_with(pattern)
-        })
+        // otherwise just do contains() logic
+        if pattern.contains(",") {
+            pattern.split(",").any(|pattern| {
+                target.starts_with(pattern)
+            })
+        } else {
+            target.contains(pattern)
+        }
     }
 }
 
@@ -39,7 +43,7 @@ macro_rules! string_filters {
     ($table:expr, $( ($id:expr, |$arg:ident| $mapper:expr) ),* $(,)?) => {
         $(
             $table.column_filter(Box::new(
-                $crate::StringColumnFilter::new(
+                StringColumnFilter::new(
                     $id,
                     std::rc::Rc::clone(&$table),
                     Box::new(|$arg| $mapper)
@@ -48,6 +52,105 @@ macro_rules! string_filters {
         )*
     };
 }
+
+pub struct U8ColumnFilter<T> {
+    id: String,
+    column_filter_state: ColumnFilterState<T>,
+    mapper: Box<dyn Fn(&T) -> u8>,
+    str_mapper: Box<dyn Fn(&T) -> String>
+}
+
+impl <T> U8ColumnFilter<T> {
+    pub fn new(id: &str, table_filter: Rc<TableFilter<T>>, mapper: Box<dyn Fn(&T) -> u8>, str_mapper: Box<dyn Fn(&T) -> String>) -> Self {
+        Self {
+            id: id.to_string(),
+            column_filter_state: ColumnFilterState::new(&table_filter),
+            mapper,
+            str_mapper
+        }
+    }
+    const LESS_THAN_REGEX: LazyCell<Regex> = LazyCell::new(|| Regex::new(r#"^<[0-9]+$"#).unwrap());
+    const LESS_THAN_EQUAL_REGEX: LazyCell<Regex> = LazyCell::new(|| Regex::new(r#"^<=[0-9]+$"#).unwrap());
+    const GREATER_THAN_REGEX: LazyCell<Regex> = LazyCell::new(|| Regex::new(r#"^>[0-9]+$"#).unwrap());
+    const GREATER_THAN_EQUAL_REGEX: LazyCell<Regex> = LazyCell::new(|| Regex::new(r#"^>=[0-9]+$"#).unwrap());
+}
+
+impl <T> ColumnFilter<T> for U8ColumnFilter<T> {
+    fn id(&self) -> &str { self.id.as_str() }
+    fn get_value(&self, t: &T) -> ScalarValue { ScalarValue::U8((self.mapper)(t)) }
+    fn column_filter_state(&self) -> &ColumnFilterState<T> { &self.column_filter_state }
+    fn search_pattern(&self, pattern: &String, target: &String) -> bool {
+        pattern.split(",").into_iter().all(|pattern| {
+            if pattern.contains("<=") && Self::LESS_THAN_EQUAL_REGEX.is_match(pattern) {
+                let x: Result<u8, _> = target.parse();
+                let y: Result<u8, _> = pattern.replace("<=", "").parse();
+                if let Ok(x) = x && let Ok(y) = y {
+                    x <= y
+                } else {
+                    false
+                }
+            } else if pattern.contains(">=") && Self::GREATER_THAN_EQUAL_REGEX.is_match(pattern) {
+                let x: Result<u8, _> = target.parse();
+                let y: Result<u8, _> = pattern.replace(">=", "").parse();
+                if let Ok(x) = x && let Ok(y) = y {
+                    x >= y
+                } else {
+                    false
+                }
+            } else if pattern.contains("<") && Self::LESS_THAN_REGEX.is_match(pattern) {
+                let x: Result<u8, _> = target.parse();
+                let y: Result<u8, _> = pattern.replace("<", "").parse();
+                if let Ok(x) = x && let Ok(y) = y {
+                    x < y
+                } else {
+                    false
+                }
+            } else if pattern.contains(">") && Self::GREATER_THAN_REGEX.is_match(pattern) {
+                let x: Result<u8, _> = target.parse();
+                let y: Result<u8, _> = pattern.replace(">", "").parse();
+                if let Ok(x) = x && let Ok(y) = y {
+                    x > y
+                } else {
+                    false
+                }
+            } else {
+                target.starts_with(pattern)
+            }
+        })
+    }
+    fn get_string_value(&self, t: &T) -> String { (self.str_mapper)(t) }
+}
+
+#[macro_export]
+macro_rules! u8_filters {
+    // This pattern allows: string_filters!(table, ("id1", |x| ...), ("id2", |x| ...))
+    ($table:expr, $( ($id:expr, |$arg:ident| $mapper:expr) ),* $(,)?) => {
+        $(
+            $table.column_filter(Box::new(
+                U8ColumnFilter::new(
+                    $id,
+                    std::rc::Rc::clone(&$table),
+                    Box::new(|$arg| $mapper),
+                    Box::new(|$arg| $mapper.to_string())
+                )
+            ));
+        )*
+    };
+
+    ($table:expr, $( ($id:expr, |$arg:ident| $mapper:expr, |$str_arg:ident| $str_mapper:expr) ),* $(,)?) => {
+        $(
+            $table.column_filter(Box::new(
+                U8ColumnFilter::new(
+                    $id,
+                    std::rc::Rc::clone(&$table),
+                    Box::new(|$arg| $mapper),
+                    Box::new(|$str_arg| $str_mapper)
+                )
+            ));
+        )*
+    };
+}
+
 
 pub struct U32ColumnFilter<T> {
     id: String,
@@ -123,7 +226,7 @@ macro_rules! u32_filters {
     ($table:expr, $( ($id:expr, |$arg:ident| $mapper:expr) ),* $(,)?) => {
         $(
             $table.column_filter(Box::new(
-                $crate::U32ColumnFilter::new(
+                ColumnFilter::new(
                     $id,
                     std::rc::Rc::clone(&$table),
                     Box::new(|$arg| $mapper),
@@ -136,7 +239,104 @@ macro_rules! u32_filters {
     ($table:expr, $( ($id:expr, |$arg:ident| $mapper:expr, |$str_arg:ident| $str_mapper:expr) ),* $(,)?) => {
         $(
             $table.column_filter(Box::new(
-                $crate::U32ColumnFilter::new(
+                U32ColumnFilter::new(
+                    $id,
+                    std::rc::Rc::clone(&$table),
+                    Box::new(|$arg| $mapper),
+                    Box::new(|$str_arg| $str_mapper)
+                )
+            ));
+        )*
+    };
+}
+pub struct USizeColumnFilter<T> {
+    id: String,
+    column_filter_state: ColumnFilterState<T>,
+    mapper: Box<dyn Fn(&T) -> usize>,
+    str_mapper: Box<dyn Fn(&T) -> String>
+}
+
+impl <T> USizeColumnFilter<T> {
+    pub fn new(id: &str, table_filter: Rc<TableFilter<T>>, mapper: Box<dyn Fn(&T) -> usize>, str_mapper: Box<dyn Fn(&T) -> String>) -> Self {
+        Self {
+            id: id.to_string(),
+            column_filter_state: ColumnFilterState::new(&table_filter),
+            mapper,
+            str_mapper
+        }
+    }
+    const LESS_THAN_REGEX: LazyCell<Regex> = LazyCell::new(|| Regex::new(r#"^<[0-9]+$"#).unwrap());
+    const LESS_THAN_EQUAL_REGEX: LazyCell<Regex> = LazyCell::new(|| Regex::new(r#"^<=[0-9]+$"#).unwrap());
+    const GREATER_THAN_REGEX: LazyCell<Regex> = LazyCell::new(|| Regex::new(r#"^>[0-9]+$"#).unwrap());
+    const GREATER_THAN_EQUAL_REGEX: LazyCell<Regex> = LazyCell::new(|| Regex::new(r#"^>=[0-9]+$"#).unwrap());
+}
+
+impl <T> ColumnFilter<T> for USizeColumnFilter<T> {
+    fn id(&self) -> &str { self.id.as_str() }
+    fn get_value(&self, t: &T) -> ScalarValue { ScalarValue::USize((self.mapper)(t)) }
+    fn get_string_value(&self, t: &T) -> String { (self.str_mapper)(t) }
+    fn column_filter_state(&self) -> &ColumnFilterState<T> { &self.column_filter_state }
+    fn search_pattern(&self, pattern: &String, target: &String) -> bool {
+        pattern.split(",").into_iter().all(|pattern| {
+            if pattern.contains("<=") && Self::LESS_THAN_EQUAL_REGEX.is_match(pattern) {
+                let x: Result<usize, _> = target.parse();
+                let y: Result<usize, _> = pattern.replace("<=", "").parse();
+                if let Ok(x) = x && let Ok(y) = y {
+                    x <= y
+                } else {
+                    false
+                }
+            } else if pattern.contains(">=") && Self::GREATER_THAN_EQUAL_REGEX.is_match(pattern) {
+                let x: Result<usize, _> = target.parse();
+                let y: Result<usize, _> = pattern.replace(">=", "").parse();
+                if let Ok(x) = x && let Ok(y) = y {
+                    x >= y
+                } else {
+                    false
+                }
+            } else if pattern.contains("<") && Self::LESS_THAN_REGEX.is_match(pattern) {
+                let x: Result<usize, _> = target.parse();
+                let y: Result<usize, _> = pattern.replace("<", "").parse();
+                if let Ok(x) = x && let Ok(y) = y {
+                    x < y
+                } else {
+                    false
+                }
+            } else if pattern.contains(">") && Self::GREATER_THAN_REGEX.is_match(pattern) {
+                let x: Result<usize, _> = target.parse();
+                let y: Result<usize, _> = pattern.replace(">", "").parse();
+                if let Ok(x) = x && let Ok(y) = y {
+                    x > y
+                } else {
+                    false
+                }
+            } else {
+                target.starts_with(pattern)
+            }
+        })
+    }
+}
+
+#[macro_export]
+macro_rules! usize_filters {
+    // This pattern allows: string_filters!(table, ("id1", |x| ...), ("id2", |x| ...))
+    ($table:expr, $( ($id:expr, |$arg:ident| $mapper:expr) ),* $(,)?) => {
+        $(
+            $table.column_filter(Box::new(
+                ColumnFilter::new(
+                    $id,
+                    std::rc::Rc::clone(&$table),
+                    Box::new(|$arg| $mapper),
+                    Box::new(|$arg| $mapper.to_string())
+                )
+            ));
+        )*
+    };
+
+    ($table:expr, $( ($id:expr, |$arg:ident| $mapper:expr, |$str_arg:ident| $str_mapper:expr) ),* $(,)?) => {
+        $(
+            $table.column_filter(Box::new(
+                USizeColumnFilter::new(
                     $id,
                     std::rc::Rc::clone(&$table),
                     Box::new(|$arg| $mapper),
@@ -270,10 +470,10 @@ impl <T> ColumnFilter<T> for NaiveDateColumnFilter<T> {
 
         if let ScalarValue::I32(n) = self.get_value(t) &&
             let Some(s) = NaiveDate::from_epoch_days(n).map(|nd| nd.format(&self.date_str_pattern).to_string()) {
-                s
-            } else {
-                "PARSE ERR".to_string()
-            }
+            s
+        } else {
+            "PARSE ERR".to_string()
+        }
     }
 
     fn column_filter_state(&self) -> &ColumnFilterState<T> { &self.column_filter_state }
@@ -325,7 +525,7 @@ macro_rules! naive_date_filters {
     ($table:expr, $( ($id:expr, |$arg:ident| $mapper:expr) ),* $(,)?) => {
         $(
             $table.column_filter(Box::new(
-                $crate::NaiveDateColumnFilter::new(
+                NaiveDateColumnFilter::new(
                     $id,
                     std::rc::Rc::clone(&$table),
                     "%-m/%-d/%Y".to_string(),
@@ -337,7 +537,7 @@ macro_rules! naive_date_filters {
     ($table:expr, $( ($id:expr, |$arg:ident| $mapper:expr, $formatter:expr) ),* $(,)?) => {
         $(
             $table.column_filter(Box::new(
-                $crate::NaiveDateColumnFilter::new(
+                NaiveDateColumnFilter::new(
                     $id,
                     std::rc::Rc::clone(&$table),
                     $formatter.to_string(),
@@ -378,7 +578,7 @@ macro_rules! bool_filters {
     ($table:expr, $( ($id:expr, |$arg:ident| $mapper:expr) ),* $(,)?) => {
         $(
             $table.column_filter(Box::new(
-                $crate::BoolColumnFilter::new(
+                BoolColumnFilter::new(
                     $id,
                     std::rc::Rc::clone(&$table),
                     Box::new(|$arg| $mapper),
@@ -390,7 +590,7 @@ macro_rules! bool_filters {
     ($table:expr, $( ($id:expr, |$arg:ident| $mapper:expr, |$str_arg:ident| $str_mapper:expr) ),* $(,)?) => {
         $(
             $table.column_filter(Box::new(
-                $crate::BoolColumnFilter::new(
+                BoolColumnFilter::new(
                     $id,
                     std::rc::Rc::clone(&$table),
                     Box::new(|$arg| $mapper),

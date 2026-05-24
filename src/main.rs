@@ -9,7 +9,7 @@ use std::any::Any;
 use std::cell::RefCell;
 use std::error::Error;
 use std::rc::Rc;
-use crate::column_filters::{I32ColumnFilter, NaiveDateColumnFilter, StringColumnFilter, U32ColumnFilter, BoolColumnFilter};
+use crate::column_filters::{NaiveDateColumnFilter, StringColumnFilter, U32ColumnFilter, BoolColumnFilter};
 use crate::table_filter::{ColumnFilter, TableFilter};
 
 mod table_filter;
@@ -43,14 +43,14 @@ fn main() -> eframe::Result {
 }
 
 struct TableFilterApp {
-    flights: Rc<Vec<Flight>>,
+    flights: Rc<RefCell<Vec<Flight>>>,
     table_filter: Rc<TableFilter<Flight>>,
 }
 
 impl Default for TableFilterApp {
     fn default() -> Self {
         // backing data and table filter objects MUST be in a Rc.
-        let flights = Rc::new(generate_random_flights(1_000));
+        let flights = Rc::new(RefCell::new(generate_random_flights(1_000)));
         let table_filter = TableFilter::new(&flights);
 
         // STRING FILTERS
@@ -162,7 +162,9 @@ impl App for TableFilterApp {
                 })
                 .body(|mut body| {
 
-                    let filtered_flights = self.flights.iter()
+                    let binding = self.flights.borrow();
+                    let filtered_flights = binding
+                        .iter()
                         .filter(|flt| self.table_filter.evaluate(&flt))
                         .collect::<Vec<_>>();
 
